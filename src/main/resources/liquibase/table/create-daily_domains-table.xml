@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="
+        http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.9.xsd">
+
+    <changeSet id="create-daily_domains-table" author="dblukherov">
+        <preConditions>
+            <not>
+                <tableExists tableName="daily_domains"/>
+            </not>
+        </preConditions>
+
+        <createTable tableName="daily_domains">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+
+            <column name="domainname" type="varchar(255)"/>
+            <column name="hotness" type="int"/>
+            <column name="price" type="int"/>
+            <column name="x_value" type="int"/>
+            <column name="yandex_tic" type="int"/>
+            <column name="links" type="int"/>
+            <column name="visitors" type="int"/>
+            <column name="registrar" type="varchar(255)"/>
+            <column name="old" type="int"/>
+            <column name="delete_date" type="date"/>
+            <column name="rkn" type="boolean"/>
+            <column name="judicial" type="boolean"/>
+            <column name="block" type="boolean"/>
+
+        </createTable>
+    </changeSet>
+
+</databaseChangeLog>
