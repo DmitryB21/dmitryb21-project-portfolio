@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Тренды (Standalone)</title>
+    <link rel="stylesheet" href="assets/css/styles.css">
+    <script src="env.js"></script>
+    <script src="assets/js/common.js"></script>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <div class="brand"><strong>Тренды</strong> <span class="muted">Standalone</span></div>
+        <div class="nav">
+          <a href="index.html">Главная</a>
+          <a href="trends.html">Тренды</a>
+          <a href="search.html">Поиск</a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="controls">
+          <button id="btn-daily" class="btn active" data-period="daily">📅 За день</button>
+          <button id="btn-weekly" class="btn" data-period="weekly">📆 За неделю</button>
+          <button id="btn-monthly" class="btn" data-period="monthly">📊 За месяц</button>
+        </div>
+        <div id="trends-list" class="trends-list">
+          <div class="loading">Загрузка...</div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let currentPeriod = 'daily';
+      const buttons = ['btn-daily','btn-weekly','btn-monthly'];
+      buttons.forEach(id => {
+        const el = document.getElementById(id);
+        el.addEventListener('click', () => {
+          buttons.forEach(i => document.getElementById(i).classList.remove('active'));
+          el.classList.add('active');
+          currentPeriod = el.getAttribute('data-period');
+          loadTrends();
+        });
+      });
+
+      async function loadTrends() {
+        try {
+          const data = await apiGet(`/pro/api/trends?period=${currentPeriod}&limit=20`);
+          const list = document.getElementById('trends-list');
+          list.innerHTML = '';
+          (data.trends || []).forEach((trend, index) => {
+            const item = document.createElement('div');
+            item.className = 'trend-item';
+            const title = trend.title || 'Без названия';
+            const color = trend.topic_color || '#3b82f6';
+            const messageCount = trend.message_count ?? 0;
+            const channelCount = trend.channel_count ?? 0;
+            const avgSim = (trend.avg_similarity ?? 0).toFixed(2);
+            const dir = trend.trend_direction || 'stable';
+            const icon = trend.trend_icon || '➡️';
+            const growth = (trend.growth_percentage ?? 0);
+            item.innerHTML = `
+              <div class="trend-rank">${index + 1}</div>
+              <div class="trend-info">
+                <div class="trend-name" style="color: ${color}">${escapeHtml(title)}</div>
+                <div class="trend-metrics">
+                  <span class="trend-metric">${formatNumber(messageCount)} упоминаний</span>
+                  <span class="trend-metric">${formatNumber(channelCount)} каналов</span>
+                  <span class="trend-metric">Схожесть: ${avgSim}</span>
+                  <span class="trend-growth ${dir}">${icon} ${growth > 0 ? '+' : ''}${growth}%</span>
+                </div>
+              </div>
+            `;
+            list.appendChild(item);
+          });
+        } catch (e) {
+          document.getElementById('trends-list').innerHTML = '<div class="error">Ошибка загрузки трендов</div>';
+        }
+      }
+
+      loadTrends();
+    </script>
+  </body>
+</html>
+
+

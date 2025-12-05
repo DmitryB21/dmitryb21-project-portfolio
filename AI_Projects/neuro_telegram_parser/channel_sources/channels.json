@@ -1,0 +1,244 @@
+{
+    "channels": [
+        {
+            "name": "Mash",
+            "username": "breakingmash",
+            "category": "Новости, расследования"
+        },
+        {
+            "name": "RT на русском",
+            "username": "rt_russian",
+            "category": "Новости, политика"
+        },
+        {
+            "name": "Baza",
+            "username": "bazabazon",
+            "category": "Новости, расследования"
+        },
+        {
+            "name": "Медуза",
+            "username": "meduza_io",
+            "category": "Новости, аналитика"
+        },
+        {
+            "name": "Яндекс",
+            "username": "yandex",
+            "category": "Новости, технологии"
+        },
+        {
+            "name": "TASS",
+            "username": "tass_agency",
+            "category": "Новости, политика"
+        },
+        {
+            "name": "РИА Новости",
+            "username": "rian_ru",
+            "category": "Новости, политика"
+        },
+        {
+            "name": "ВЧК-ОГПУ",
+            "username": "vchkogpu",
+            "category": "Новости, расследования"
+        },
+        {
+            "name": "South Front",
+            "username": "southfronteng",
+            "category": "Геополитика, военные новости"
+        },
+        {
+            "name": "Кремль. Новости",
+            "username": "news_kremlin_eng",
+            "category": "Новости, политика"
+        },
+        {
+            "name": "Vedomosti",
+            "username": "vedomosti",
+            "category": "Экономика, новости"
+        },
+        {
+            "name": "Коммерсантъ",
+            "username": "kommersant",
+            "category": "Экономика, новости"
+        },
+        {
+            "name": "РБК",
+            "username": "rbc_news",
+            "category": "Экономика, новости"
+        },
+        {
+            "name": "TV Rain",
+            "username": "tvrain",
+            "category": "Новости, аналитика"
+        },
+        {
+            "name": "Readovka",
+            "username": "readovka",
+            "category": "Новости, расследования"
+        },
+        {
+            "name": "Раньше всех",
+            "username": "ransevshe",
+            "category": "Новости, мемы"
+        },
+        {
+            "name": "Прямой Эфир • Новости",
+            "username": "prianoi",
+            "category": "Новости, политика"
+        },
+        {
+            "name": "Intel Slava Z",
+            "username": "intelslava_z",
+            "category": "Новости, геополитика"
+        },
+        {
+            "name": "GGSTANDOFF",
+            "username": "ggstandoff",
+            "category": "Игры, сообщество"
+        },
+        {
+            "name": "Lenta.ru",
+            "username": "lenta_ru",
+            "category": "Новости, аналитика"
+        },
+        {
+            "name": "РИА Новости. Наука",
+            "username": "rian_science",
+            "category": "Наука, технологии"
+        },
+        {
+            "name": "Medialeaks",
+            "username": "medialeaks",
+            "category": "Новости, расследования"
+        },
+        {
+            "name": "РИА Новости. Культура",
+            "username": "rian_culture",
+            "category": "Культура, аналитика"
+        },
+        {
+            "name": "Sputnik Россия",
+            "username": "sputnik_russia",
+            "category": "Новости, аналитика"
+        },
+        {
+            "name": "ТАСС Спорт",
+            "username": "tass_sport",
+            "category": "Спорт"
+        },
+        {
+            "name": "Спорт-Экспресс",
+            "username": "sport_express",
+            "category": "Спорт"
+        },
+        {
+            "name": "РИА Новости. Политика",
+            "username": "rian_politics",
+            "category": "Новости, политика"
+        },
+        {
+            "name": "Новая Газета",
+            "username": "novaya_gazeta",
+            "category": "Новости, расследования"
+        },
+        {
+            "name": "Новости Эфир",
+            "username": "novosti_efir",
+            "category": "Новости"
+        },
+        {
+            "name": "Топор Live",
+            "username": "toporlive",
+            "category": "Новости"
+        },
+        {
+            "name": "Осторожно Новости",
+            "username": "ostorozhno_novosti",
+            "category": "Новости"
+        },
+        {
+            "name": "Rhymes",
+            "username": "rhymestg",
+            "category": "Новости, аналитика"
+        },
+        {
+            "name": "Война Белгород Новости",
+            "username": "voina_belgorod_novosti",
+            "category": "Новости, военные"
+        },
+        {
+            "name": "Правда Dirty",
+            "username": "pravdadirty",
+            "category": "Новости, расследования"
+        },
+        {
+            "name": "Screen Shot True",
+            "username": "ScreenShotTrue",
+            "category": "Новости"
+        },
+        {
+            "name": "Shot Shot",
+            "username": "shot_shot",
+            "category": "Новости"
+        },
+        {
+            "name": "РИА Новости Россия",
+            "username": "Ria_novosti_rossiya",
+            "category": "Новости, политика"
+        },
+        {
+            "name": "Два Майора",
+            "username": "dva_majors",
+            "category": "Новости, аналитика"
+        },
+        {
+            "name": "Варламов News",
+            "username": "varlamov_news",
+            "category": "Новости, аналитика"
+        },
+        {
+            "name": "Kontext",
+            "username": "kontext_channel",
+            "category": "Новости, аналитика"
+        },
+        {
+            "name": "Миль Инфо Live",
+            "username": "milinfolive",
+            "category": "Новости, военные"
+        },
+        {
+            "name": "Петров Tel",
+            "username": "petrovtel",
+            "category": "Новости, аналитика"
+        },
+        {
+            "name": "Зарубин Reporter",
+            "username": "zarubinreporter",
+            "category": "Новости, репортажи"
+        },
+        {
+            "name": "Live Piter",
+            "username": "live_piter",
+            "category": "Новости, региональные"
+        },
+        {
+            "name": "Инфо Москва 24",
+            "username": "infomoscow24",
+            "category": "Новости, региональные"
+        },
+        {
+            "name": "BBC Russian",
+            "username": "bbcrussian",
+            "category": "Новости, аналитика"
+        },
+        {
+            "name": "ЧП Севастополь",
+            "username": "chp_sevastopol",
+            "category": "Новости, региональные"
+        },
+        {
+            "name": "Царьград",
+            "username": "tsargradtv",
+            "category": "Новости, политика"
+        }
+    ]
+}

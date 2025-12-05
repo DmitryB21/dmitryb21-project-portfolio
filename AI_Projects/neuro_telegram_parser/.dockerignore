@@ -1,0 +1,85 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+.venv311/
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+*.log.*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Documentation
+docs/
+*.md
+!readme.md
+
+# Data (не копируем большие файлы)
+*.db
+*.sqlite
+*.sqlite3
+
+# Models (будут скачаны в контейнере)
+models/*.gguf
+models/*.bin
+
+# Artifacts (будут созданы в контейнере)
+artifacts/classification/
+artifacts/cluster/
+
+# Temporary files
+*.tmp
+*.bak
+
+# OS
+.DS_Store
+Thumbs.db
+
+# CUDA packages
+*.deb
+*.deb.*
+
+# Presentation files
+*.pptx
+*_presentation.py
+
+# Scripts (не все нужны в контейнере)
+scripts/download_qwen_model.py
+scripts/test_*.py
+
+# Standalone frontend (опционально)
+standalone_frontend/
+

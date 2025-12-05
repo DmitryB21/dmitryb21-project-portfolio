@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Поиск (Standalone)</title>
+    <link rel="stylesheet" href="assets/css/styles.css">
+    <script src="env.js"></script>
+    <script src="assets/js/common.js"></script>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <div class="brand"><strong>Поиск</strong> <span class="muted">Standalone</span></div>
+        <div class="nav">
+          <a href="index.html">Главная</a>
+          <a href="trends.html">Тренды</a>
+          <a href="search.html">Поиск</a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="controls">
+          <input id="q" class="input" placeholder="Введите запрос..." />
+          <select id="days" class="select">
+            <option value="0">За все время</option>
+            <option value="1">За 1 день</option>
+            <option value="7">За 7 дней</option>
+            <option value="30">За 30 дней</option>
+          </select>
+          <button id="btn" class="btn">Искать</button>
+        </div>
+        <div id="results" class="events-list">
+          <div class="muted">Введите запрос и нажмите Искать</div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      document.getElementById('btn').addEventListener('click', doSearch);
+      document.getElementById('q').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') doSearch();
+      });
+
+      function buildDateFrom(days) {
+        if (!days || days === '0') return null;
+        const d = new Date();
+        d.setDate(d.getDate() - parseInt(days, 10));
+        return d.toISOString();
+      }
+
+      async function doSearch() {
+        const q = document.getElementById('q').value.trim();
+        const days = document.getElementById('days').value;
+        const results = document.getElementById('results');
+        if (!q) {
+          results.innerHTML = '<div class="muted">Введите запрос</div>';
+          return;
+        }
+        try {
+          results.innerHTML = '<div class="loading">Поиск...</div>';
+          const params = new URLSearchParams({ query: q, limit: '20' });
+          const dateFrom = buildDateFrom(days);
+          if (dateFrom) params.append('date_from', dateFrom);
+          const data = await apiGet(`/pro/api/search?${params.toString()}`);
+          results.innerHTML = '';
+          (data.results || []).forEach(r => {
+            const item = document.createElement('div');
+            item.className = 'event-item';
+            const title = r.text_preview || 'Сообщение';
+            const score = (r.score ?? 0).toFixed(3);
+            const ch = r.channel_id ? ` • канал ${r.channel_id}` : '';
+            item.innerHTML = `
+              <div class="event-title">${escapeHtml(title)}</div>
+              <div class="event-meta">score: ${score}${ch}</div>
+            `;
+            results.appendChild(item);
+          });
+          if (!results.children.length) results.innerHTML = '<div class="muted">Ничего не найдено</div>';
+        } catch (e) {
+          results.innerHTML = '<div class="error">Ошибка поиска</div>';
+        }
+      }
+    </script>
+  </body>
+</html>
+
+

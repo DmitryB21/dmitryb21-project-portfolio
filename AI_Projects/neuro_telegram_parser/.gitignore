@@ -1,0 +1,79 @@
+.env
+*.session
+telegram_parser.session
+__pycache__/
+.csv
+/telegram_parser/temp/
+/Материалы для УИИ Telegram-20250917T165333Z-1-001/
+.log
+temp/
+.cursor
+
+# Virtual environments
+.venv/
+.venv311/
+venv/
+env/
+ENV/
+
+# Python cache
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+*.log.*
+huey_consumer.log
+telegram_parser.log
+parser_progress.log
+topic_modeling.log
+
+# Artifacts (кроме topic_modeling)
+artifacts/classification/
+artifacts/cluster/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# CSV files (большие файлы данных)
+DB_process/*.csv
+channel_sources/*.csv
+docs/-C
+
+# OS
+.DS_Store
+Thumbs.db
+.wslconfig
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+
+# CUDA packages (если скачаны)
+*.deb
+*.deb.*
+
+# Models (если большие, можно добавить)
+# models/
+
+# Presentation files
+*.pptx
+*_presentation.py
+create_presentation.py

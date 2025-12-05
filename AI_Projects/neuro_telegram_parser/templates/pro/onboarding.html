@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro-режим — Онбординг</title>
+    <link rel="stylesheet" href="{{ url_for('send_static', path='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('send_static', path='pro-style.css') }}">
+    <style>
+        .chips { display: flex; flex-wrap: wrap; gap: 10px; }
+        .chip { padding: 8px 12px; border-radius: 16px; background: #f0f2f5; cursor: pointer; user-select: none; border: 1px solid #e5e7eb; }
+        .chip.selected { outline: 2px solid #2563eb; background: #e0e7ff; }
+        .section { background: #fff; padding: 16px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); margin-bottom: 16px; }
+        .section h3 { margin: 0 0 12px 0; }
+        .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+        .save-btn { padding: 10px 16px; background: #2563eb; color: #fff; border: none; border-radius: 8px; cursor: pointer; }
+        .save-btn:disabled { background: #9ca3af; cursor: not-allowed; }
+        .small { color: #6b7280; font-size: 12px; }
+        .input { padding: 8px 10px; border: 1px solid #e5e7eb; border-radius: 8px; }
+        .list { display: grid; gap: 8px; }
+        .card { padding: 10px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fafafa; }
+    </style>
+    </head>
+<body>
+    <div class="pro-container">
+        <nav class="pro-nav">
+            <div class="nav-brand">
+                <h1>⚙️ Онбординг</h1>
+                <span class="nav-subtitle">Выбор интересов и стартовые каналы</span>
+            </div>
+            <div class="nav-links">
+                <a href="/pro/" class="nav-link">📊 Дашборд</a>
+                <a href="/pro/onboarding" class="nav-link active">⚙️ Настройки</a>
+                <a href="/pro/feed" class="nav-link">📰 Лента</a>
+                <a href="/pro/search" class="nav-link">🔍 Поиск</a>
+                <a href="/pro/trends" class="nav-link">📈 Тренды</a>
+                <a href="/" class="nav-link back-link">← Назад</a>
+            </div>
+        </nav>
+
+        <main class="pro-main">
+            <div class="section">
+                <h3>1) Выберите темы</h3>
+                <div id="topics" class="chips"><div class="small">Загрузка тем...</div></div>
+                <div class="small" id="topics-selected">Выбрано: 0</div>
+            </div>
+
+            <div class="section">
+                <h3>2) Добавьте стартовые каналы (необязательно)</h3>
+                <div class="row">
+                    <input id="channel-input" class="input" placeholder="username или ID" />
+                    <button class="save-btn" onclick="addSeedChannel()">Добавить</button>
+                </div>
+                <div id="seed-list" class="list" style="margin-top:10px"></div>
+                <div class="small">Совет: добавьте 3–5 ваших любимых каналов для начальной персонализации</div>
+            </div>
+
+            <div class="section">
+                <h3>3) Сохранить</h3>
+                <button id="save-btn" class="save-btn" onclick="savePreferences()" disabled>Сохранить предпочтения</button>
+                <span class="small" id="save-status"></span>
+            </div>
+
+            <div class="section">
+                <h3>Рекомендации каналов</h3>
+                <div id="reco-list" class="list"><div class="small">Нет данных. Сохраните интересы, чтобы получить рекомендации.</div></div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        let allTopics = [];
+        let selectedTopics = [];
+        let seedChannels = [];
+
+        function renderTopics() {
+            const wrap = document.getElementById('topics');
+            wrap.innerHTML = '';
+            allTopics.forEach(t => {
+                const el = document.createElement('div');
+                el.className = 'chip' + (selectedTopics.includes(t.id) ? ' selected' : '');
+                el.style.borderColor = t.color || '#e5e7eb';
+                el.style.color = '#111827';
+                el.textContent = t.name;
+                el.onclick = () => {
+                    const idx = selectedTopics.indexOf(t.id);
+                    if (idx === -1) selectedTopics.push(t.id); else selectedTopics.splice(idx, 1);
+                    renderTopics();
+                    updateSelectedCount();
+                    updateSaveEnabled();
+                };
+                wrap.appendChild(el);
+            });
+        }
+
+        function updateSelectedCount() {
+            document.getElementById('topics-selected').textContent = `Выбрано: ${selectedTopics.length}`;
+        }
+
+        function updateSaveEnabled() {
+            document.getElementById('save-btn').disabled = selectedTopics.length === 0 && seedChannels.length === 0;
+        }
+
+        function renderSeeds() {
+            const list = document.getElementById('seed-list');
+            list.innerHTML = '';
+            if (seedChannels.length === 0) {
+                list.innerHTML = '<div class="small">Каналы не добавлены</div>';
+                return;
+            }
+            seedChannels.forEach((c, i) => {
+                const div = document.createElement('div');
+                div.className = 'card';
+                div.textContent = c;
+                div.onclick = () => { seedChannels.splice(i,1); renderSeeds(); updateSaveEnabled(); };
+                list.appendChild(div);
+            });
+        }
+
+        function addSeedChannel() {
+            const val = document.getElementById('channel-input').value.trim();
+            if (!val) return;
+            if (!seedChannels.includes(val)) seedChannels.push(val);
+            document.getElementById('channel-input').value = '';
+            renderSeeds();
+            updateSaveEnabled();
+        }
+
+        async function savePreferences() {
+            try {
+                const res = await fetch('/pro/api/onboarding/preferences', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: 'default_user', selected_topics: selectedTopics, seed_channels: seedChannels })
+                });
+                const data = await res.json();
+                document.getElementById('save-status').textContent = data.status === 'success' ? 'Сохранено' : (data.error || 'Ошибка');
+                if (data.status === 'success') {
+                    loadRecommendations();
+                }
+            } catch (e) {
+                document.getElementById('save-status').textContent = 'Ошибка сети';
+            }
+        }
+
+        async function loadTopics() {
+            try {
+                const res = await fetch('/pro/api/topics');
+                const data = await res.json();
+                allTopics = data.topics || [];
+                renderTopics();
+            } catch (e) {
+                document.getElementById('topics').innerHTML = '<div class="small">Ошибка загрузки тем</div>';
+            }
+        }
+
+        async function loadRecommendations() {
+            try {
+                const res = await fetch('/pro/api/onboarding/recommendations?user_id=default_user&limit=10');
+                const data = await res.json();
+                const list = document.getElementById('reco-list');
+                list.innerHTML = '';
+                if (!data.recommendations || data.recommendations.length === 0) {
+                    list.innerHTML = '<div class="small">Пока нет рекомендаций</div>';
+                    return;
+                }
+                data.recommendations.forEach(r => {
+                    const div = document.createElement('div');
+                    div.className = 'card';
+                    div.innerHTML = `<b>${r.name || r.username || r.id}</b> — сообщений: ${r.message_count ?? '-'}, score: ${r.avg_topic_score ?? '-'}`;
+                    list.appendChild(div);
+                });
+            } catch (e) {
+                document.getElementById('reco-list').innerHTML = '<div class="small">Ошибка загрузки рекомендаций</div>';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadTopics();
+            renderSeeds();
+            updateSelectedCount();
+            updateSaveEnabled();
+        });
+    </script>
+</body>
+</html>
+
+

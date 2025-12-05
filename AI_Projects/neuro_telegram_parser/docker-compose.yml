@@ -1,0 +1,109 @@
+version: '3.8'
+
+# Примечание: PostgreSQL, Redis и Qdrant развернуты на том же сервере, что и приложение
+# Используется network_mode: host для доступа к localhost сервисам
+# Настройте переменные окружения в .env файле для подключения к локальным сервисам
+
+services:
+  # Flask веб-приложение
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: telegram_parser_web
+    environment:
+      # Telegram API
+      TELEGRAM_API_ID: ${TELEGRAM_API_ID}
+      TELEGRAM_API_HASH: ${TELEGRAM_API_HASH}
+      TELEGRAM_PHONE_NUMBER: ${TELEGRAM_PHONE_NUMBER}
+      
+      # PostgreSQL (локальный сервер)
+      POSTGRES_DSN: ${POSTGRES_DSN}
+      POSTGRES_CUSTOMER_DSN: ${POSTGRES_CUSTOMER_DSN}
+      
+      # Redis (локальный сервер)
+      REDIS_HOST: ${REDIS_HOST:-127.0.0.1}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      
+      # Qdrant (локальный сервер)
+      QDRANT_HOST: ${QDRANT_HOST:-127.0.0.1}
+      QDRANT_PORT: ${QDRANT_PORT:-6333}
+      
+      # OpenAI
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      
+      # JWT и безопасность
+      SECRET_KEY: ${SECRET_KEY}
+      DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:-change_me_strong_password}
+      DEFAULT_ADMIN_EMAIL: ${DEFAULT_ADMIN_EMAIL:-admin@example.com}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
+      
+      # Flask
+      FLASK_ENV: production
+      FLASK_DEBUG: "0"
+    volumes:
+      - ./telegram_parser.session:/app/telegram_parser.session:rw
+      - ./channel_sources:/app/channel_sources:ro
+      - ./artifacts:/app/artifacts:rw
+      - models_cache:/app/data/models
+      - sessions_data:/app/data/sessions
+    ports:
+      - "5000:5000"
+    network_mode: host
+    restart: unless-stopped
+    command: python app.py
+
+  # Huey worker для фоновых задач
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: telegram_parser_worker
+    environment:
+      # Telegram API
+      TELEGRAM_API_ID: ${TELEGRAM_API_ID}
+      TELEGRAM_API_HASH: ${TELEGRAM_API_HASH}
+      TELEGRAM_PHONE_NUMBER: ${TELEGRAM_PHONE_NUMBER}
+      
+      # PostgreSQL (локальный сервер)
+      POSTGRES_DSN: ${POSTGRES_DSN}
+      POSTGRES_CUSTOMER_DSN: ${POSTGRES_CUSTOMER_DSN}
+      
+      # Redis (локальный сервер)
+      REDIS_HOST: ${REDIS_HOST:-127.0.0.1}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      
+      # Qdrant (локальный сервер)
+      QDRANT_HOST: ${QDRANT_HOST:-127.0.0.1}
+      QDRANT_PORT: ${QDRANT_PORT:-6333}
+      
+      # OpenAI
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      
+      # JWT и безопасность
+      SECRET_KEY: ${SECRET_KEY}
+      DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:-change_me_strong_password}
+      DEFAULT_ADMIN_EMAIL: ${DEFAULT_ADMIN_EMAIL:-admin@example.com}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
+      
+      # Flask
+      FLASK_ENV: production
+      FLASK_DEBUG: "0"
+    volumes:
+      - ./telegram_parser.session:/app/telegram_parser.session:rw
+      - ./channel_sources:/app/channel_sources:ro
+      - ./artifacts:/app/artifacts:rw
+      - models_cache:/app/data/models
+      - sessions_data:/app/data/sessions
+    network_mode: host
+    restart: unless-stopped
+    command: python huey_consumer.py
+
+volumes:
+  models_cache:
+    driver: local
+  sessions_data:
+    driver: local
+

@@ -1,0 +1,36 @@
+# Основные библиотеки для работы с Telegram
+pyrogram>=2.0.0
+TgCrypto>=1.2.0  # Ускоритель для pyrogram
+
+# Веб-сервер и связанные компоненты
+flask>=2.0.0
+redis>=4.0.0
+huey>=2.0.0
+
+# Работа с базами данных
+asyncpg>=0.25.0
+pandas>=1.3.0
+
+# Pro-режим: NLP и векторный поиск
+openai>=1.0.0  # Для генерации заголовков через OpenAI GPT API
+qdrant-client>=1.6.0
+numpy>=1.21.0
+scikit-learn>=1.0.0
+hdbscan>=0.8.33
+
+# Topic Modeling Service (pro_mode/topic_modeling_service.py)
+# Требуется для тематического моделирования с BERTopic, FRIDA и GTE
+sentence-transformers>=2.2.0  # Для FRIDA и GTE embedders (требует huggingface-hub, tqdm)
+bertopic>=0.15.0  # Для тематического моделирования
+umap-learn>=0.5.3  # Для снижения размерности в BERTopic
+huggingface-hub>=0.16.0  # Требуется sentence-transformers
+tqdm>=4.64.0  # Требуется sentence-transformers и openai
+psutil>=5.9.0  # Мониторинг ресурсов пайплайна
+requests>=2.28.0  # Для скриптов (start_qdrant.py, download_qwen_model.py)
+
+# Утилиты
+python-dotenv>=0.19.0
+
+# Аутентификация и авторизация
+bcrypt>=4.0.0  # Хэширование паролей (используется напрямую, не через passlib)
+PyJWT>=2.8.0

@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Управление пользователями - Pro-режим</title>
+    <link rel="stylesheet" href="/static/pro-style.css">
+    <style>
+        .users-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .users-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+        
+        .users-header h2 {
+            margin: 0;
+            color: #2c3e50;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+        
+        .users-table {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .users-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .users-table th {
+            background: #f8f9fa;
+            padding: 16px;
+            text-align: left;
+            font-weight: 600;
+            color: #2c3e50;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        
+        .users-table td {
+            padding: 16px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .users-table tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .role-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .role-admin {
+            background: #ff6b6b;
+            color: white;
+        }
+        
+        .role-analyst {
+            background: #4ecdc4;
+            color: white;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .status-active {
+            background: #51cf66;
+            color: white;
+        }
+        
+        .status-inactive {
+            background: #868e96;
+            color: white;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .btn-edit, .btn-delete {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+        
+        .btn-edit {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-edit:hover {
+            background: #5568d3;
+        }
+        
+        .btn-delete {
+            background: #ff6b6b;
+            color: white;
+        }
+        
+        .btn-delete:hover {
+            background: #ee5a5a;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            overflow: auto;
+        }
+        
+        .modal-content {
+            background: white;
+            margin: 5% auto;
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 500px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+        
+        .modal-header h3 {
+            margin: 0;
+            color: #2c3e50;
+        }
+        
+        .close {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .close:hover {
+            color: #000;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #2c3e50;
+        }
+        
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+        
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .form-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            margin-top: 24px;
+        }
+        
+        .btn-cancel {
+            background: #868e96;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .btn-cancel:hover {
+            background: #727a82;
+        }
+        
+        .btn-save {
+            background: #51cf66;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .btn-save:hover {
+            background: #40c057;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .error-message {
+            background: #ffebee;
+            color: #c62828;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .success-message {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .password-hint {
+            font-size: 12px;
+            color: #666;
+            margin-top: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="pro-container">
+        <!-- Навигация Pro-режима -->
+        <nav class="pro-nav">
+            <div class="nav-brand">
+                <h1>🚀 Pro-режим</h1>
+                <span class="nav-subtitle">Нейро-ассистент для аналитики новостей</span>
+            </div>
+            <div class="nav-container">
+                <a href="#" id="logout-btn" class="nav-link logout-link">🚪 Выход</a>
+                <div class="nav-links">
+                    <a href="/pro/" class="nav-link">📊 Дашборд</a>
+                    <a href="/pro/feed" class="nav-link">📰 Лента</a>
+                    <a href="/pro/search" class="nav-link">🔍 Поиск</a>
+                    <a href="/pro/trends" class="nav-link">📈 Тренды</a>
+                    <a href="/pro/onboarding" class="nav-link">⚙️ Настройки</a>
+                    <a href="/pro/users" class="nav-link active">👥 Пользователи</a>
+                    <a href="/parser/" class="nav-link parser-link">📡 Управление парсером</a>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Основной контент -->
+        <main class="pro-main">
+            <div class="users-container">
+                <div class="users-header">
+                    <h2>👥 Управление пользователями</h2>
+                    <button class="btn-primary" onclick="openCreateModal()">+ Создать пользователя</button>
+                </div>
+
+                <div id="message-container"></div>
+
+                <div class="users-table">
+                    <div id="users-loading" class="loading">Загрузка пользователей...</div>
+                    <table id="users-table" style="display: none;">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Username</th>
+                                <th>Email</th>
+                                <th>Роль</th>
+                                <th>Статус</th>
+                                <th>Создан</th>
+                                <th>Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-tbody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Модальное окно создания/редактирования -->
+    <div id="user-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title">Создать пользователя</h3>
+                <span class="close" onclick="closeModal()">&times;</span>
+            </div>
+            <form id="user-form" onsubmit="saveUser(event)">
+                <input type="hidden" id="user-id" value="">
+                
+                <div class="form-group">
+                    <label for="username">Username *</label>
+                    <input type="text" id="username" required minlength="3" maxlength="50">
+                </div>
+                
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email">
+                </div>
+                
+                <div class="form-group">
+                    <label for="role">Роль *</label>
+                    <select id="role" required>
+                        <option value="analyst">Analyst</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password" id="password-label">Пароль *</label>
+                    <input type="password" id="password" minlength="6">
+                    <div class="password-hint" id="password-hint">Минимум 6 символов</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="is_active">Активен</label>
+                    <select id="is_active">
+                        <option value="true">Да</option>
+                        <option value="false">Нет</option>
+                    </select>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel" onclick="closeModal()">Отмена</button>
+                    <button type="submit" class="btn-save">Сохранить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/static/auth.js"></script>
+    <script>
+        let currentUser = null;
+        let editingUserId = null;
+
+        // Загрузка текущего пользователя и проверка прав
+        async function init() {
+            try {
+                const response = await AuthUtils.fetch('/auth/me');
+                if (!response.ok) {
+                    window.location.href = '/login';
+                    return;
+                }
+                
+                currentUser = await response.json();
+                
+                // Проверяем, что пользователь - администратор
+                if (currentUser.role !== 'admin') {
+                    showMessage('Доступ запрещен. Только администраторы могут управлять пользователями.', 'error');
+                    setTimeout(() => {
+                        window.location.href = '/pro/';
+                    }, 2000);
+                    return;
+                }
+                
+                // Загружаем список пользователей
+                loadUsers();
+                
+                // Обработчик кнопки выхода
+                const logoutBtn = document.getElementById('logout-btn');
+                if (logoutBtn) {
+                    logoutBtn.addEventListener('click', async (e) => {
+                        e.preventDefault();
+                        await AuthUtils.logout();
+                    });
+                }
+            } catch (error) {
+                console.error('Ошибка инициализации:', error);
+                window.location.href = '/login';
+            }
+        }
+
+        // Загрузка списка пользователей
+        async function loadUsers() {
+            try {
+                const response = await AuthUtils.fetch('/auth/users');
+                if (!response.ok) {
+                    throw new Error('Ошибка загрузки пользователей');
+                }
+                
+                const data = await response.json();
+                renderUsers(data.users || []);
+            } catch (error) {
+                console.error('Ошибка загрузки пользователей:', error);
+                showMessage('Ошибка загрузки пользователей', 'error');
+            }
+        }
+
+        // Отображение списка пользователей
+        function renderUsers(users) {
+            const loading = document.getElementById('users-loading');
+            const table = document.getElementById('users-table');
+            const tbody = document.getElementById('users-tbody');
+            
+            loading.style.display = 'none';
+            table.style.display = 'table';
+            
+            if (users.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px;">Нет пользователей</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = users.map(user => `
+                <tr>
+                    <td>${user.id}</td>
+                    <td><strong>${user.username}</strong></td>
+                    <td>${user.email || '—'}</td>
+                    <td><span class="role-badge role-${user.role}">${user.role}</span></td>
+                    <td><span class="status-badge status-${user.is_active ? 'active' : 'inactive'}">${user.is_active ? 'Активен' : 'Неактивен'}</span></td>
+                    <td>${user.created_at ? new Date(user.created_at).toLocaleDateString('ru-RU') : '—'}</td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn-edit" onclick="openEditModal(${user.id})">✏️ Редактировать</button>
+                            ${user.id !== currentUser.id ? `<button class="btn-delete" onclick="deleteUser(${user.id}, '${user.username}')">🗑️ Удалить</button>` : ''}
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Открытие модального окна создания
+        function openCreateModal() {
+            editingUserId = null;
+            document.getElementById('modal-title').textContent = 'Создать пользователя';
+            document.getElementById('user-form').reset();
+            document.getElementById('user-id').value = '';
+            document.getElementById('password').required = true;
+            document.getElementById('password-label').innerHTML = 'Пароль *';
+            document.getElementById('password-hint').style.display = 'block';
+            document.getElementById('is_active').value = 'true';
+            document.getElementById('user-modal').style.display = 'block';
+        }
+
+        // Открытие модального окна редактирования
+        async function openEditModal(userId) {
+            try {
+                const response = await AuthUtils.fetch('/auth/users');
+                if (!response.ok) {
+                    throw new Error('Ошибка загрузки пользователей');
+                }
+                
+                const data = await response.json();
+                const user = data.users.find(u => u.id === userId);
+                
+                if (!user) {
+                    showMessage('Пользователь не найден', 'error');
+                    return;
+                }
+                
+                editingUserId = userId;
+                document.getElementById('modal-title').textContent = 'Редактировать пользователя';
+                document.getElementById('user-id').value = user.id;
+                document.getElementById('username').value = user.username;
+                document.getElementById('email').value = user.email || '';
+                document.getElementById('role').value = user.role;
+                document.getElementById('is_active').value = user.is_active ? 'true' : 'false';
+                document.getElementById('password').required = false;
+                document.getElementById('password-label').innerHTML = 'Пароль (оставьте пустым, чтобы не менять)';
+                document.getElementById('password-hint').style.display = 'none';
+                document.getElementById('password').value = '';
+                document.getElementById('user-modal').style.display = 'block';
+            } catch (error) {
+                console.error('Ошибка загрузки пользователя:', error);
+                showMessage('Ошибка загрузки пользователя', 'error');
+            }
+        }
+
+        // Закрытие модального окна
+        function closeModal() {
+            document.getElementById('user-modal').style.display = 'none';
+            editingUserId = null;
+        }
+
+        // Сохранение пользователя
+        async function saveUser(event) {
+            event.preventDefault();
+            
+            const formData = {
+                username: document.getElementById('username').value,
+                email: document.getElementById('email').value || null,
+                role: document.getElementById('role').value,
+                is_active: document.getElementById('is_active').value === 'true'
+            };
+            
+            const password = document.getElementById('password').value;
+            if (password) {
+                formData.password = password;
+            }
+            
+            try {
+                let response;
+                if (editingUserId) {
+                    // Обновление
+                    response = await AuthUtils.fetch(`/auth/users/${editingUserId}`, {
+                        method: 'PUT',
+                        body: JSON.stringify(formData)
+                    });
+                } else {
+                    // Создание
+                    if (!password) {
+                        showMessage('Пароль обязателен при создании пользователя', 'error');
+                        return;
+                    }
+                    response = await AuthUtils.fetch('/auth/users', {
+                        method: 'POST',
+                        body: JSON.stringify(formData)
+                    });
+                }
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showMessage(data.message || 'Пользователь успешно сохранен', 'success');
+                    closeModal();
+                    loadUsers();
+                } else {
+                    showMessage(data.message || data.error || 'Ошибка сохранения пользователя', 'error');
+                }
+            } catch (error) {
+                console.error('Ошибка сохранения пользователя:', error);
+                showMessage('Ошибка сохранения пользователя', 'error');
+            }
+        }
+
+        // Удаление пользователя
+        async function deleteUser(userId, username) {
+            if (!confirm(`Вы уверены, что хотите удалить пользователя "${username}"?\n\nЭто действие нельзя отменить!`)) {
+                return;
+            }
+            
+            try {
+                const response = await AuthUtils.fetch(`/auth/users/${userId}`, {
+                    method: 'DELETE'
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showMessage('Пользователь успешно удален', 'success');
+                    loadUsers();
+                } else {
+                    showMessage(data.message || data.error || 'Ошибка удаления пользователя', 'error');
+                }
+            } catch (error) {
+                console.error('Ошибка удаления пользователя:', error);
+                showMessage('Ошибка удаления пользователя', 'error');
+            }
+        }
+
+        // Показать сообщение
+        function showMessage(message, type) {
+            const container = document.getElementById('message-container');
+            container.innerHTML = `<div class="${type === 'error' ? 'error-message' : 'success-message'}">${message}</div>`;
+            setTimeout(() => {
+                container.innerHTML = '';
+            }, 5000);
+        }
+
+        // Закрытие модального окна при клике вне его
+        window.onclick = function(event) {
+            const modal = document.getElementById('user-modal');
+            if (event.target === modal) {
+                closeModal();
+            }
+        }
+
+        // Инициализация при загрузке страницы
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
+

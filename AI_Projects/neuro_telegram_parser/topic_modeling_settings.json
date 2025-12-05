@@ -1,0 +1,19 @@
+{
+  "use_openai_for_titles": true,
+  "openai_model": "gpt-3.5-turbo",
+  "openai_temperature": 0.3,
+  "openai_max_tokens": 50,
+  "openai_timeout": 30.0,
+  "frida_device": "cpu",
+  "gte_device": "cpu",
+  "hdbscan_min_cluster_size": 3,
+  "nr_topics_auto": true,
+  "max_topics": 100,
+  "umap_n_neighbors": 15,
+  "umap_n_components": 3,
+  "max_title_length": 100,
+  "num_sample_texts": 3,
+  "batch_size_qdrant": 100,
+  "max_posts_for_clustering": 50000,
+  "rerun_interval_hours": 24
+}

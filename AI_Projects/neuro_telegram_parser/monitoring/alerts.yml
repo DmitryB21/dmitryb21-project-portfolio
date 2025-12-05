@@ -1,0 +1,135 @@
+# Правила алертов для Prometheus
+
+groups:
+  - name: telegram_parser_critical
+    interval: 30s
+    rules:
+      # Критические ошибки
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Высокий процент ошибок 5xx"
+          description: "Error rate превышает 5% в течение 5 минут"
+
+      # Недоступность сервиса
+      - alert: ServiceDown
+        expr: up{job="telegram-parser-web"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Сервис недоступен"
+          description: "Web сервис не отвечает более 1 минуты"
+
+      # Высокая задержка
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Высокая задержка P95"
+          description: "P95 latency превышает 2 секунды"
+
+  - name: telegram_parser_resources
+    interval: 30s
+    rules:
+      # Высокое использование CPU
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 90
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Высокое использование CPU"
+          description: "CPU usage превышает 90%"
+
+      # Высокое использование памяти
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 90
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Высокое использование памяти"
+          description: "Memory usage превышает 90%"
+
+      # Мало места на диске
+      - alert: LowDiskSpace
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 10
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Мало места на диске"
+          description: "Свободного места на диске менее 10%"
+
+  - name: telegram_parser_database
+    interval: 30s
+    rules:
+      # Проблемы с PostgreSQL
+      - alert: PostgreSQLDown
+        expr: pg_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL недоступен"
+          description: "PostgreSQL не отвечает"
+
+      # Низкий cache hit ratio в PostgreSQL
+      - alert: LowPostgreSQLCacheHitRatio
+        expr: (sum(rate(pg_stat_database_blks_hit[5m])) / sum(rate(pg_stat_database_blks_hit[5m]) + rate(pg_stat_database_blks_read[5m]))) * 100 < 90
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Низкий cache hit ratio в PostgreSQL"
+          description: "Cache hit ratio ниже 90%"
+
+      # Проблемы с Redis
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis недоступен"
+          description: "Redis не отвечает"
+
+      # Высокое использование памяти Redis
+      - alert: HighRedisMemoryUsage
+        expr: (redis_memory_used_bytes / redis_memory_max_bytes) * 100 > 90
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Высокое использование памяти Redis"
+          description: "Memory usage Redis превышает 90%"
+
+  - name: telegram_parser_tasks
+    interval: 30s
+    rules:
+      # Длинная очередь задач
+      - alert: LongTaskQueue
+        expr: huey_queue_length > 1000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Длинная очередь задач"
+          description: "В очереди более 1000 задач"
+
+      # Высокий процент провалившихся задач
+      - alert: HighTaskFailureRate
+        expr: (rate(huey_tasks_failed_total[5m]) / rate(huey_tasks_total[5m])) * 100 > 10
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Высокий процент провалившихся задач"
+          description: "Failure rate задач превышает 10%"
+

@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Pro Dashboard (Standalone)</title>
+    <link rel="stylesheet" href="assets/css/styles.css">
+    <script src="env.js"></script>
+    <script src="assets/js/common.js"></script>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <div class="brand">
+          <strong>Pro Dashboard</strong> <span class="muted">Standalone</span>
+        </div>
+        <div class="nav">
+          <a href="index.html">Главная</a>
+          <a href="trends.html">Тренды</a>
+          <a href="search.html">Поиск</a>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="col-12">
+          <div class="card">
+            <h3 class="section-title">Общая статистика</h3>
+            <div id="stats" class="grid">
+              <div class="col-3">
+                <div class="card">
+                  <div class="muted">Сообщений</div>
+                  <div id="stat-total-messages" style="font-size: 22px; font-weight: 700;">—</div>
+                </div>
+              </div>
+              <div class="col-3">
+                <div class="card">
+                  <div class="muted">Событий</div>
+                  <div id="stat-total-events" style="font-size: 22px; font-weight: 700;">—</div>
+                </div>
+              </div>
+              <div class="col-3">
+                <div class="card">
+                  <div class="muted">Тем</div>
+                  <div id="stat-total-topics" style="font-size: 22px; font-weight: 700;">—</div>
+                </div>
+              </div>
+              <div class="col-3">
+                <div class="card">
+                  <div class="muted">Каналов</div>
+                  <div id="stat-total-channels" style="font-size: 22px; font-weight: 700;">—</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-6">
+          <div class="card">
+            <h3 class="section-title">🔥 Топ тренды сегодня</h3>
+            <div id="trends-list" class="trends-list">
+              <div class="loading">Загрузка...</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-6">
+          <div class="card">
+            <h3 class="section-title">📝 Последние события</h3>
+            <div id="events-list" class="events-list">
+              <div class="loading">Загрузка...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      async function loadStats() {
+        try {
+          const data = await apiGet('/pro/api/stats');
+          document.getElementById('stat-total-messages').textContent = formatNumber(data.total_messages || 0);
+          document.getElementById('stat-total-events').textContent = formatNumber(data.events_count || 0);
+          document.getElementById('stat-total-topics').textContent = formatNumber(data.topics_count || 0);
+          document.getElementById('stat-total-channels').textContent = formatNumber(data.channels_count || 0);
+        } catch (e) {
+          document.getElementById('stats').innerHTML = '<div class="error">Ошибка загрузки статистики</div>';
+        }
+      }
+
+      async function loadTrends() {
+        try {
+          const data = await apiGet('/pro/api/trends?period=daily&limit=5');
+          const list = document.getElementById('trends-list');
+          list.innerHTML = '';
+          (data.trends || []).forEach((trend, index) => {
+            const item = document.createElement('div');
+            item.className = 'trend-item';
+            const title = trend.title || 'Без названия';
+            const color = trend.topic_color || '#3b82f6';
+            const messageCount = trend.message_count ?? 0;
+            const channelCount = trend.channel_count ?? 0;
+            const dir = trend.trend_direction || 'stable';
+            const icon = trend.trend_icon || '➡️';
+            const growth = (trend.growth_percentage ?? 0);
+            item.innerHTML = `
+              <div class="trend-rank">${index + 1}</div>
+              <div class="trend-info">
+                <div class="trend-name" style="color: ${color}">${escapeHtml(title)}</div>
+                <div class="trend-metrics">
+                  <span class="trend-metric">${formatNumber(messageCount)} упоминаний</span>
+                  <span class="trend-metric">${formatNumber(channelCount)} каналов</span>
+                  <span class="trend-growth ${dir}">${icon} ${growth > 0 ? '+' : ''}${growth}%</span>
+                </div>
+              </div>
+            `;
+            list.appendChild(item);
+          });
+        } catch (e) {
+          document.getElementById('trends-list').innerHTML = '<div class="error">Ошибка загрузки трендов</div>';
+        }
+      }
+
+      async function loadRecentEvents() {
+        try {
+          const data = await apiGet('/pro/api/feed?limit=5');
+          const list = document.getElementById('events-list');
+          list.innerHTML = '';
+          (data.events || []).forEach(ev => {
+            const item = document.createElement('div');
+            item.className = 'event-item';
+            const title = ev.title || (ev.summary ? ev.summary.substring(0, 100) : 'Событие без названия');
+            const msgCount = ev.message_count ?? 0;
+            const channels = ev.channel_names ? ev.channel_names.length : 0;
+            item.innerHTML = `
+              <div class="event-title">${escapeHtml(title)}</div>
+              <div class="event-meta">${formatNumber(msgCount)} сообщений • ${formatNumber(channels)} каналов</div>
+            `;
+            list.appendChild(item);
+          });
+        } catch (e) {
+          document.getElementById('events-list').innerHTML = '<div class="error">Ошибка загрузки событий</div>';
+        }
+      }
+
+      (async () => {
+        await Promise.all([loadStats(), loadTrends(), loadRecentEvents()]);
+      })();
+    </script>
+  </body>
+</html>
+
+

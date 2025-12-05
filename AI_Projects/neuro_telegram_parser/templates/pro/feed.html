@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro-режим — Персонализированная лента</title>
+    <link rel="stylesheet" href="{{ url_for('send_static', path='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('send_static', path='pro-style.css') }}">
+    <style>
+        .event-card { background: #fff; padding: 16px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); margin-bottom: 16px; }
+        .event-title { font-size: 18px; font-weight: 600; margin-bottom: 8px; color: #111827; }
+        .event-meta { color: #6b7280; font-size: 14px; margin-bottom: 12px; }
+        .event-summary { color: #374151; line-height: 1.5; margin-bottom: 12px; }
+        .event-stats { display: flex; gap: 16px; font-size: 14px; color: #6b7280; }
+        .event-channels { margin-top: 12px; }
+        .channel-tag { display: inline-block; background: #f3f4f6; padding: 4px 8px; border-radius: 6px; font-size: 12px; margin-right: 8px; margin-bottom: 4px; }
+        .loading { text-align: center; padding: 40px; color: #6b7280; }
+        .error { text-align: center; padding: 40px; color: #dc2626; }
+        .filters { background: #fff; padding: 16px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); margin-bottom: 20px; }
+        .filter-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+        .filter-row:last-child { margin-bottom: 0; }
+        .btn { padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; }
+        .btn-primary { background: #2563eb; color: #fff; }
+        .btn-secondary { background: #f3f4f6; color: #374151; }
+        .input { padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; }
+        .select { padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; background: #fff; }
+        
+        /* Стили для режима "Показать по темам" */
+        .topic-view-mode { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+        .topic-tabs { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .topic-tab { padding: 8px 16px; border: 2px solid #e5e7eb; border-radius: 8px; background: #fff; cursor: pointer; transition: all 0.2s; font-size: 14px; white-space: nowrap; }
+        .topic-tab:hover { border-color: #2563eb; background: #f0f7ff; }
+        .topic-tab.active { border-color: #2563eb; background: #2563eb; color: #fff; font-weight: 600; }
+        .checkbox-wrapper { display: flex; align-items: center; gap: 8px; }
+        .checkbox-wrapper input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
+        .checkbox-wrapper label { cursor: pointer; user-select: none; }
+    </style>
+</head>
+<body>
+    <div class="pro-container">
+        <nav class="pro-nav">
+            <div class="nav-brand">
+                <h1>📰 Персонализированная лента</h1>
+                <span class="nav-subtitle">События по вашим интересам</span>
+            </div>
+            <div class="nav-links">
+                <a href="/pro/" class="nav-link">📊 Дашборд</a>
+                <a href="/pro/feed" class="nav-link active">📰 Лента</a>
+                <a href="/pro/search" class="nav-link">🔍 Поиск</a>
+                <a href="/pro/trends" class="nav-link">📈 Тренды</a>
+                <a href="/pro/onboarding" class="nav-link">⚙️ Настройки</a>
+                <a href="/" class="nav-link back-link">← Назад</a>
+            </div>
+        </nav>
+
+        <main class="pro-main">
+            <!-- Фильтры -->
+            <div class="filters">
+                <h3>Фильтры</h3>
+                <div class="filter-row">
+                    <label>Период:</label>
+                    <select id="date-filter" class="select">
+                        <option value="">Все время</option>
+                        <option value="today">Сегодня</option>
+                        <option value="week">Неделя</option>
+                        <option value="month">Месяц</option>
+                    </select>
+                    <button class="btn btn-primary" onclick="loadFeed()">Обновить</button>
+                </div>
+            </div>
+
+            <!-- Режим просмотра по темам -->
+            <div class="filters">
+                <div class="topic-view-mode">
+                    <div class="checkbox-wrapper">
+                        <input type="checkbox" id="show-by-topics" onchange="toggleTopicViewMode()">
+                        <label for="show-by-topics">📋 Показать по темам</label>
+                    </div>
+                    <div id="topic-tabs-container" class="topic-tabs" style="display: none;">
+                        <!-- Табы будут добавлены динамически -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Список событий -->
+            <div id="events-container">
+                <div class="loading">Загрузка событий...</div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        let allTopics = [];
+        let currentFilters = {};
+        let activeTopicTab = null;
+        let topicViewMode = false;
+
+        async function loadTopics() {
+            try {
+                const res = await fetch('/pro/api/topics');
+                const data = await res.json();
+                allTopics = data.topics || [];
+                
+                // Строим табы для режима "Показать по темам"
+                buildTopicTabs();
+            } catch (e) {
+                console.error('Ошибка загрузки тем:', e);
+            }
+        }
+        
+        function buildTopicTabs() {
+            const container = document.getElementById('topic-tabs-container');
+            if (!container) return;
+            
+            container.innerHTML = '';
+            
+            // Добавляем таб "Все темы"
+            const allTab = document.createElement('div');
+            allTab.className = 'topic-tab active';
+            allTab.textContent = '📰 Все темы';
+            allTab.onclick = () => selectTopicTab(null, allTab);
+            container.appendChild(allTab);
+            activeTopicTab = allTab;
+            
+            // Добавляем табы для каждой темы
+            allTopics.forEach(topic => {
+                const tab = document.createElement('div');
+                tab.className = 'topic-tab';
+                tab.textContent = topic.name;
+                tab.dataset.topicId = topic.id;
+                tab.onclick = () => selectTopicTab(topic.id, tab);
+                container.appendChild(tab);
+            });
+        }
+        
+        function selectTopicTab(topicId, tabElement) {
+            // Убираем активность со всех табов
+            document.querySelectorAll('.topic-tab').forEach(t => t.classList.remove('active'));
+            
+            // Делаем выбранный таб активным
+            tabElement.classList.add('active');
+            activeTopicTab = tabElement;
+            
+            // Загружаем feed с выбранной темой
+            currentFilters.topic_id = topicId;
+            loadFeed();
+        }
+        
+        // Инициализация при загрузке
+        function initTopicViewMode() {
+            const checkbox = document.getElementById('show-by-topics');
+            if (checkbox && checkbox.checked) {
+                toggleTopicViewMode();
+            }
+            
+            // Проверяем, есть ли cluster_id в URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const clusterId = urlParams.get('cluster_id');
+            if (clusterId) {
+                // Показываем сообщения конкретного кластера
+                loadClusterMessages(clusterId);
+            }
+        }
+        
+        async function loadClusterMessages(clusterId) {
+            try {
+                const container = document.getElementById('events-container');
+                container.innerHTML = '<div class="loading">Загрузка сообщений события...</div>';
+                
+                // Получаем детали события (включая сообщения)
+                const eventRes = await fetch(`/pro/api/events/${clusterId}`);
+                const eventData = await eventRes.json();
+                
+                if (!eventData.event) {
+                    container.innerHTML = '<div class="error">Событие не найдено</div>';
+                    return;
+                }
+                
+                const event = eventData.event;
+                
+                container.innerHTML = '';
+                
+                // Показываем заголовок события
+                const eventHeader = document.createElement('div');
+                eventHeader.className = 'event-card';
+                eventHeader.style.marginBottom = '20px';
+                eventHeader.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                eventHeader.style.color = 'white';
+                eventHeader.innerHTML = `
+                    <div class="event-title" style="color: white; font-size: 24px; margin-bottom: 12px;">
+                        ${event.title || 'Событие без названия'}
+                    </div>
+                    <div class="event-meta" style="color: rgba(255,255,255,0.9); margin-bottom: 8px;">
+                        ${event.messages?.length || 0} сообщений
+                    </div>
+                    ${event.summary ? `<div class="event-summary" style="color: rgba(255,255,255,0.95);">${event.summary}</div>` : ''}
+                `;
+                container.appendChild(eventHeader);
+                
+                // Показываем сообщения
+                if (event.messages && event.messages.length > 0) {
+                    event.messages.forEach((msg, index) => {
+                        const messageCard = document.createElement('div');
+                        messageCard.className = 'event-card';
+                        
+                        const date = msg.date ? new Date(msg.date).toLocaleString('ru-RU') : 
+                                    (msg.published_at ? new Date(msg.published_at).toLocaleString('ru-RU') : 'Дата неизвестна');
+                        
+                        messageCard.innerHTML = `
+                            <div class="event-title">📨 Сообщение ${index + 1}${msg.is_primary ? ' (основное)' : ''}</div>
+                            <div class="event-meta">${date} • Канал: ${msg.channel_name || 'Неизвестен'}</div>
+                            <div class="event-summary">${msg.text || ''}</div>
+                        `;
+                        container.appendChild(messageCard);
+                    });
+                } else {
+                    container.innerHTML += '<div class="error">Событие не содержит сообщений</div>';
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки сообщений кластера:', error);
+                document.getElementById('events-container').innerHTML = '<div class="error">Ошибка загрузки сообщений события</div>';
+            }
+        }
+        
+        function toggleTopicViewMode() {
+            const checkbox = document.getElementById('show-by-topics');
+            const tabsContainer = document.getElementById('topic-tabs-container');
+            const filtersSection = document.querySelector('.filters:first-of-type'); // Первая секция фильтров
+            
+            topicViewMode = checkbox.checked;
+            
+            if (topicViewMode) {
+                tabsContainer.style.display = 'flex';
+                if (filtersSection) filtersSection.style.display = 'none'; // Скрываем старые фильтры
+            } else {
+                tabsContainer.style.display = 'none';
+                if (filtersSection) filtersSection.style.display = 'block'; // Показываем старые фильтры
+                currentFilters = {};
+                loadFeed();
+            }
+        }
+
+        async function loadFeed() {
+            try {
+                const container = document.getElementById('events-container');
+                container.innerHTML = '<div class="loading">Загрузка событий...</div>';
+
+                // Если режим "Показать по темам" включен и выбрана тема (не "Все темы")
+                if (topicViewMode && currentFilters.topic_id !== undefined && currentFilters.topic_id !== null) {
+                    // Загружаем сообщения по выбранной теме
+                    const res = await fetch(`/pro/api/messages/by-topic?topic_id=${currentFilters.topic_id}&limit=50`);
+                    const data = await res.json();
+                    
+                    if (data.messages && data.messages.length > 0) {
+                        container.innerHTML = '';
+                        data.messages.forEach(msg => {
+                            const messageCard = document.createElement('div');
+                            messageCard.className = 'event-card';
+                            
+                            const date = msg.published_at ? new Date(msg.published_at).toLocaleString('ru-RU') : 'Дата неизвестна';
+                            
+                            messageCard.innerHTML = `
+                                <div class="event-title">📨 Сообщение #${msg.message_id}</div>
+                                <div class="event-meta">${date} • Канал: ${msg.channel_name} • Уверенность: ${(msg.score * 100).toFixed(1)}%</div>
+                                <div class="event-summary">${msg.text}</div>
+                            `;
+                            container.appendChild(messageCard);
+                        });
+                    } else {
+                        container.innerHTML = '<div class="error">Сообщений по этой теме не найдено. Попробуйте запустить классификацию на дашборде.</div>';
+                    }
+                    return;
+                }
+                
+                // Если режим "Показать по темам" включен, но выбрана "Все темы" или режим выключен - показываем обычные кластеры
+
+                // Обычная загрузка событий (кластеров)
+                const filters = {};
+                const dateFilter = document.getElementById('date-filter').value;
+
+                if (dateFilter) {
+                    const now = new Date();
+                    if (dateFilter === 'today') {
+                        filters.date_from = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+                    } else if (dateFilter === 'week') {
+                        filters.date_from = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+                    } else if (dateFilter === 'month') {
+                        filters.date_from = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+                    }
+                }
+
+                // Загружаем события
+                const params = new URLSearchParams({
+                    user_id: 'default_user',
+                    limit: '20',
+                    offset: '0',
+                    ...filters
+                });
+
+                const res = await fetch(`/pro/api/feed?${params}`);
+                const data = await res.json();
+
+                if (data.events && data.events.length > 0) {
+                    container.innerHTML = '';
+                    data.events.forEach(event => {
+                        const eventCard = document.createElement('div');
+                        eventCard.className = 'event-card';
+                        
+                        const channelNames = event.channel_names || [];
+                        const channelTags = channelNames.map(name => `<span class="channel-tag">${name}</span>`).join('');
+                        
+                        eventCard.innerHTML = `
+                            <div class="event-title">${event.title || 'Без названия'}</div>
+                            <div class="event-meta">
+                                ${new Date(event.created_at).toLocaleString('ru-RU')} • 
+                                ${event.message_count || 0} сообщений • 
+                                ${channelNames.length} каналов
+                            </div>
+                            <div class="event-summary">${event.summary || ''}</div>
+                            <div class="event-stats">
+                                <span>📊 Сообщений: ${event.message_count || 0}</span>
+                                <span>📺 Каналов: ${channelNames.length}</span>
+                            </div>
+                            ${channelTags ? `<div class="event-channels">${channelTags}</div>` : ''}
+                        `;
+                        container.appendChild(eventCard);
+                    });
+                } else {
+                    container.innerHTML = '<div class="error">События не найдены. Попробуйте изменить фильтры или настроить интересы в разделе "Настройки".</div>';
+                }
+
+            } catch (e) {
+                console.error('Ошибка загрузки ленты:', e);
+                document.getElementById('events-container').innerHTML = '<div class="error">Ошибка загрузки событий</div>';
+            }
+        }
+
+        // Инициализация
+        document.addEventListener('DOMContentLoaded', function() {
+            loadTopics().then(() => {
+                // Проверяем, есть ли cluster_id в URL
+                const urlParams = new URLSearchParams(window.location.search);
+                const clusterId = urlParams.get('cluster_id');
+                if (clusterId) {
+                    // Показываем сообщения конкретного кластера
+                    loadClusterMessages(clusterId);
+                } else {
+                    // Показываем обычную ленту
+                    loadFeed();
+                }
+                initTopicViewMode();
+            });
+        });
+    </script>
+</body>
+</html>
