@@ -1,0 +1,29 @@
+# Neuro_Doc_Assistant - Dependencies
+# Python >= 3.8
+
+# Testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+
+# Ingestion Module
+tiktoken>=0.5.0  # GPT-style BPE токенизация для Chunker
+requests>=2.31.0  # HTTP клиент для EmbeddingService
+urllib3>=2.0.0  # Retry стратегия для requests
+
+# Vector Database
+qdrant-client>=1.6.0  # Qdrant клиент для индексации
+
+# API Layer
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.0.0
+
+# UI Layer
+streamlit>=1.28.0
+
+# Monitoring
+prometheus-client>=0.18.0
+
+# Future dependencies (для следующих модулей)
+# ragas>=0.1.0
+
