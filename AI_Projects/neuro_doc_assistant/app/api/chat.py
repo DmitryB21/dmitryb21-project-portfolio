@@ -82,8 +82,8 @@ def create_app(agent_controller: Optional[AgentController] = None) -> FastAPI:
             # Получаем контроллер из состояния приложения
             controller: AgentController = app.state.agent_controller
             
-            # Вызываем агента
-            response: AgentResponse = await controller.ask(
+            # Вызываем агента (метод ask не является async)
+            response: AgentResponse = controller.ask(
                 query=request.query,
                 k=request.k,
                 ground_truth_relevant=request.ground_truth_relevant
@@ -111,6 +111,19 @@ def create_app(agent_controller: Optional[AgentController] = None) -> FastAPI:
                 detail=str(e)
             )
         except Exception as e:
+            import traceback
+            import logging
+            error_traceback = traceback.format_exc()
+            # Логируем полную ошибку для отладки
+            logger = logging.getLogger(__name__)
+            logger.error(f"ERROR in /ask endpoint: {str(e)}")
+            logger.error(f"Traceback: {error_traceback}")
+            # Также выводим в консоль для немедленного просмотра
+            print(f"\n{'='*80}")
+            print(f"ERROR in /ask endpoint: {str(e)}")
+            print(f"{'='*80}")
+            print(f"Traceback:\n{error_traceback}")
+            print(f"{'='*80}\n")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Ошибка при обработке запроса: {str(e)}"

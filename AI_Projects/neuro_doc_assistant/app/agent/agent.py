@@ -208,7 +208,32 @@ class AgentController:
         
         # Шаг 1: Retrieval
         retrieval_start = time.time()
-        retrieved_chunks = self.retriever.retrieve(query, k=k)
+        try:
+            retrieved_chunks = self.retriever.retrieve(query, k=k)
+        except Exception as e:
+            # Логируем ошибку retrieval
+            import traceback
+            error_traceback = traceback.format_exc()
+            self.decision_log.log_decision(
+                state=self.state_machine.current_state.value,
+                action="retrieve_chunks_error",
+                input_data=query,
+                output_data=f"ERROR: {str(e)}",
+                metadata={"error": str(e), "traceback": error_traceback}
+            )
+            # Переходим в состояние ошибки и возвращаем ответ
+            self.state_machine.transition_to(AgentState.RETURN_RESPONSE)
+            if self.prometheus_metrics:
+                end_to_end_latency = time.time() - start_time
+                self.prometheus_metrics.record_latency(end_to_end_latency)
+                self.prometheus_metrics.decrement_active_requests()
+                self.prometheus_metrics.record_agent_error("retrieval_error")
+            return AgentResponse(
+                answer=f"Ошибка при поиске в документации: {str(e)}. Проверьте, что Qdrant доступен и коллекция 'neuro_docs' существует.",
+                sources=[],
+                metrics={}
+            )
+        
         if self.prometheus_metrics:
             retrieval_latency = time.time() - retrieval_start
             self.prometheus_metrics.record_retrieval_latency(retrieval_latency)
@@ -222,12 +247,27 @@ class AgentController:
                 metrics={}
             )
         
+        # Логируем информацию о retrieved chunks для отладки
+        chunks_info = [
+            {
+                "id": chunk.id,
+                "text_preview": chunk.text[:100] + "..." if len(chunk.text) > 100 else chunk.text,
+                "score": chunk.score,
+                "metadata": chunk.metadata
+            }
+            for chunk in retrieved_chunks
+        ]
+        
         self.decision_log.log_decision(
             state=self.state_machine.current_state.value,
             action="retrieve_chunks",
             input_data=query,
             output_data=f"{len(retrieved_chunks)} chunks retrieved",
-            metadata={"k": k, "retrieved_count": len(retrieved_chunks)}
+            metadata={
+                "k": k,
+                "retrieved_count": len(retrieved_chunks),
+                "chunks_info": chunks_info
+            }
         )
         
         # Шаг 2: Metadata Filter (опционально)

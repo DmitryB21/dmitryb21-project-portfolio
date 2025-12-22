@@ -5,8 +5,10 @@
 @created: 2024-12-19
 """
 
-from typing import List
-from app.retrieval.retriever import RetrievedChunk
+from typing import List, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.retrieval.retriever import RetrievedChunk
 
 
 class PromptBuilder:
@@ -51,7 +53,7 @@ class PromptBuilder:
     def build_prompt(
         self,
         query: str,
-        retrieved_chunks: List[RetrievedChunk]
+        retrieved_chunks: List["RetrievedChunk"]
     ) -> str:
         """
         Формирует prompt с контекстом и запросом.

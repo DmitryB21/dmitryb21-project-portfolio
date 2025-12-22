@@ -5,6 +5,14 @@
 
 set -e
 
+# Получаем директорию скрипта и переходим в корневую директорию проекта
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
+cd "$PROJECT_ROOT"
+
+# Устанавливаем PYTHONPATH
+export PYTHONPATH="$PROJECT_ROOT"
+
 echo "========================================"
 echo "Neuro_Doc_Assistant - Запуск проекта"
 echo "========================================"
@@ -24,6 +32,7 @@ echo
 echo "[Шаг 2/5] Активация виртуального окружения..."
 source venv/bin/activate
 echo "[OK] Виртуальное окружение активировано"
+echo "[OK] PYTHONPATH установлен: $PROJECT_ROOT"
 echo
 
 # Шаг 3: Проверка .env файла
@@ -69,13 +78,47 @@ case $choice in
     1)
         echo
         echo "Запуск тестов..."
+        cd "$PROJECT_ROOT"
+        export PYTHONPATH="$PROJECT_ROOT"
         python -m pytest tests/ -v
         ;;
     2)
         echo
         echo "Запуск FastAPI сервера..."
-        echo "API будет доступен по адресу: http://localhost:8000"
-        echo "Документация: http://localhost:8000/docs"
+        cd "$PROJECT_ROOT"
+        export PYTHONPATH="$PROJECT_ROOT"
+        
+        # Проверка доступности порта 8000
+        if lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null 2>&1 || nc -z localhost 8000 2>/dev/null; then
+            echo "[ВНИМАНИЕ] Порт 8000 уже занят!"
+            echo
+            echo "Варианты решения:"
+            echo "1. Остановить процесс, занимающий порт 8000"
+            echo "2. Использовать другой порт (например, 8001)"
+            echo
+            read -p "Выберите вариант (1/2) или нажмите Enter для использования порта 8001: " port_choice
+            if [ "$port_choice" = "1" ]; then
+                echo
+                echo "Поиск процесса на порту 8000..."
+                PID=$(lsof -ti:8000 2>/dev/null || fuser 8000/tcp 2>/dev/null | awk '{print $1}')
+                if [ -n "$PID" ]; then
+                    echo "Остановка процесса с PID $PID..."
+                    kill -9 $PID 2>/dev/null
+                    echo "[OK] Процесс остановлен. Запускаю сервер..."
+                fi
+                echo
+                export API_PORT=8000
+            else
+                echo
+                echo "Использую порт 8001..."
+                export API_PORT=8001
+            fi
+        else
+            export API_PORT=8000
+        fi
+        
+        echo "API будет доступен по адресу: http://localhost:${API_PORT:-8000}"
+        echo "Документация: http://localhost:${API_PORT:-8000}/docs"
         echo
         echo "Для остановки нажмите Ctrl+C"
         echo
@@ -88,11 +131,15 @@ case $choice in
         echo
         echo "Для остановки нажмите Ctrl+C"
         echo
+        cd "$PROJECT_ROOT"
+        export PYTHONPATH="$PROJECT_ROOT"
         streamlit run app/ui/streamlit_app.py
         ;;
     4)
         echo
         echo "Запуск всех тестов..."
+        cd "$PROJECT_ROOT"
+        export PYTHONPATH="$PROJECT_ROOT"
         python scripts/run_tests.py all
         ;;
     5)

@@ -28,14 +28,35 @@ def create_agent_controller() -> AgentController:
         Инициализированный AgentController
     """
     # Инициализация Qdrant клиента
-    qdrant_url = os.getenv("QDRANT_URL", "http://localhost:6333")
+    # Поддерживаем оба варианта: QDRANT_URL или QDRANT_HOST + QDRANT_PORT
+    qdrant_url = os.getenv("QDRANT_URL")
+    if not qdrant_url:
+        qdrant_host = os.getenv("QDRANT_HOST", "localhost")
+        qdrant_port = int(os.getenv("QDRANT_PORT", "6333"))
+        qdrant_url = f"http://{qdrant_host}:{qdrant_port}"
+    
     qdrant_client = QdrantClient(url=qdrant_url)
     
     # Инициализация EmbeddingService
+    # Используем GIGACHAT_AUTH_KEY для OAuth 2.0 аутентификации
+    # Поддержка обратной совместимости: если GIGACHAT_AUTH_KEY не установлен, используем GIGACHAT_API_KEY
+    gigachat_auth_key = os.getenv("GIGACHAT_AUTH_KEY")
+    if not gigachat_auth_key:
+        # Обратная совместимость: используем старый формат, если новый не установлен
+        old_api_key = os.getenv("GIGACHAT_API_KEY")
+        if old_api_key:
+            gigachat_auth_key = old_api_key
+            print("Warning: Используется старый формат GIGACHAT_API_KEY. Рекомендуется переименовать в GIGACHAT_AUTH_KEY.")
+    
+    gigachat_scope = os.getenv("GIGACHAT_SCOPE", "GIGACHAT_API_PERS")
+    use_mock_mode = not gigachat_auth_key or os.getenv("GIGACHAT_MOCK_MODE", "false").lower() == "true"
+    
     embedding_service = EmbeddingService(
-        api_key=os.getenv("GIGACHAT_API_KEY"),
         model_version=os.getenv("EMBEDDING_MODEL_VERSION", "GigaChat"),
-        embedding_dim=int(os.getenv("EMBEDDING_DIM", "1536"))
+        embedding_dim=int(os.getenv("EMBEDDING_DIM", "1536")),
+        auth_key=gigachat_auth_key,
+        scope=gigachat_scope,
+        mock_mode=use_mock_mode
     )
     
     # Инициализация компонентов
@@ -48,12 +69,12 @@ def create_agent_controller() -> AgentController:
     reranker = Reranker()  # Опциональный модуль для улучшения Precision@3
     prompt_builder = PromptBuilder()
     
-    # GigaChat API настройки
-    gigachat_api_key = os.getenv("GIGACHAT_API_KEY")
-    
+    # GigaChat API настройки для LLMClient
+    # Используем те же настройки, что и для EmbeddingService
     llm_client = LLMClient(
-        api_key=gigachat_api_key,
-        mock_mode=os.getenv("GIGACHAT_MOCK_MODE", "false").lower() == "true"
+        auth_key=gigachat_auth_key,
+        scope=gigachat_scope,
+        mock_mode=use_mock_mode
     )
     
     metrics_collector = MetricsCollector()
@@ -115,7 +136,15 @@ def create_app() -> FastAPI:
 
 
 if __name__ == "__main__":
+    import sys
     import uvicorn
+    
+    # Добавляем текущую директорию в PYTHONPATH, если её там нет
+    import os
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(current_dir)
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
     
     host = os.getenv("API_HOST", "0.0.0.0")
     port = int(os.getenv("API_PORT", "8000"))
@@ -123,10 +152,18 @@ if __name__ == "__main__":
     # Создаём приложение для запуска
     app = create_app()
     
+    # Настройка логирования uvicorn для более детального вывода ошибок
+    import logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    
     uvicorn.run(
         app,
         host=host,
         port=port,
-        reload=os.getenv("API_RELOAD", "false").lower() == "true"
+        reload=os.getenv("API_RELOAD", "false").lower() == "true",
+        log_level="info"  # Можно изменить на "debug" для более детальных логов
     )
 

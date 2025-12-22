@@ -40,7 +40,55 @@ cp .env.example .env
 
 **Важно**: Для работы с реальным GigaChat API и Qdrant укажите реальные значения в `.env`.
 
-## Шаг 3: Запуск проекта
+## Шаг 3: Запуск Qdrant
+
+Qdrant можно запустить через Docker:
+
+```bash
+# Запуск Qdrant в Docker
+docker run -p 6333:6333 -p 6334:6334 qdrant/qdrant
+```
+
+Или установить локально (см. [документацию Qdrant](https://qdrant.tech/documentation/guides/installation/)).
+
+**Проверка работы Qdrant:**
+```bash
+curl http://localhost:6333/collections
+```
+
+## Шаг 4: Загрузка документов в Qdrant (Ingestion Pipeline)
+
+Перед использованием системы необходимо загрузить документы в Qdrant:
+
+**Windows:**
+```bash
+scripts\run_ingestion.bat
+```
+
+**Linux/Mac:**
+```bash
+chmod +x scripts/run_ingestion.sh
+./scripts/run_ingestion.sh
+```
+
+**Или через Python:**
+```bash
+python scripts/run_ingestion.py
+```
+
+Скрипт автоматически:
+- Загрузит документы из `data/NeuroDoc_Data/hr/` и `data/NeuroDoc_Data/it/`
+- Разобьёт их на чанки
+- Сгенерирует embeddings
+- **Создаст коллекцию `neuro_docs` в Qdrant** (если не существует)
+- Индексирует все чанки в Qdrant
+
+**Важно:** Убедитесь, что:
+- Qdrant запущен и доступен
+- В директории `data/NeuroDoc_Data/` есть документы (MD файлы)
+- `GIGACHAT_API_KEY` настроен в `.env` (или используется mock mode)
+
+## Шаг 5: Запуск проекта
 
 ### Вариант 1: Использование скрипта запуска (рекомендуется)
 

@@ -3,7 +3,7 @@ REM Скрипт для пошагового запуска проекта Neuro
 REM Автор: Neuro_Doc_Assistant Team
 REM Дата: 2024-12-19
 
-setlocal
+setlocal enabledelayedexpansion
 
 echo ========================================
 echo Neuro_Doc_Assistant - Запуск проекта
@@ -23,13 +23,18 @@ echo.
 
 REM Шаг 2: Активация виртуального окружения
 echo [Шаг 2/5] Активация виртуального окружения...
+REM Переходим в корневую директорию проекта
+cd /d "%~dp0.."
 call venv\Scripts\activate.bat
 if errorlevel 1 (
     echo [ОШИБКА] Не удалось активировать виртуальное окружение
     pause
     exit /b 1
 )
+REM Устанавливаем PYTHONPATH
+set PYTHONPATH=%CD%
 echo [OK] Виртуальное окружение активировано
+echo [OK] PYTHONPATH установлен: %CD%
 echo.
 
 REM Шаг 3: Проверка .env файла
@@ -79,54 +84,121 @@ echo 5. Выход
 echo.
 set /p choice="Выберите действие (1-5): "
 
-if "%choice%"=="1" (
-    echo.
-    echo Запуск тестов...
-    python -m pytest tests/ -v
-    pause
-    goto :end
-)
+REM Удаляем пробелы и другие невидимые символы из переменной choice
+for /f "delims=" %%i in ("!choice!") do set choice=%%i
+set choice=!choice: =!
+set choice=!choice: =!
 
-if "%choice%"=="2" (
-    echo.
-    echo Запуск FastAPI сервера...
-    echo API будет доступен по адресу: http://localhost:8000
-    echo Документация: http://localhost:8000/docs
-    echo.
-    echo Для остановки нажмите Ctrl+C
-    echo.
-    python app/main.py
-    pause
-    goto :end
-)
+REM Переход к соответствующей метке в зависимости от выбора
+if /i "!choice!"=="1" goto :option1
+if /i "!choice!"=="2" goto :option2
+if /i "!choice!"=="3" goto :option3
+if /i "!choice!"=="4" goto :option4
+if /i "!choice!"=="5" goto :option5
 
-if "%choice%"=="3" (
-    echo.
-    echo Запуск Streamlit UI...
-    echo UI будет доступен по адресу: http://localhost:8501
-    echo.
-    echo Для остановки нажмите Ctrl+C
-    echo.
-    streamlit run app/ui/streamlit_app.py
-    pause
-    goto :end
-)
-
-if "%choice%"=="4" (
-    echo.
-    echo Запуск всех тестов...
-    python scripts/run_tests.py all
-    pause
-    goto :end
-)
-
-if "%choice%"=="5" (
-    echo Выход...
-    goto :end
-)
-
-echo [ОШИБКА] Неверный выбор!
+echo [ОШИБКА] Неверный выбор: [!choice!]
 pause
+goto :end
+
+:option1
+echo.
+echo Запуск тестов...
+cd /d "%~dp0.."
+set PYTHONPATH=%CD%
+python -m pytest tests/ -v
+pause
+goto :end
+
+:option2
+echo.
+echo Запуск FastAPI сервера...
+cd /d "%~dp0.."
+set PYTHONPATH=%CD%
+
+REM Проверка доступности порта 8000
+netstat -ano | findstr :8000 >nul 2>&1
+if not errorlevel 1 (
+    echo [ВНИМАНИЕ] Порт 8000 уже занят!
+    echo.
+    echo Варианты решения:
+    echo 1. Остановить процесс, занимающий порт 8000
+    echo 2. Использовать другой порт (например, 8001)
+    echo.
+    set /p port_choice="Выберите вариант (1/2) или нажмите Enter для использования порта 8001: "
+    if "!port_choice!"=="1" (
+        echo.
+        echo Поиск процесса на порту 8000...
+        for /f "tokens=5" %%a in ('netstat -ano ^| findstr :8000 ^| findstr LISTENING') do (
+            echo Остановка процесса с PID %%a...
+            taskkill /F /PID %%a >nul 2>&1
+        )
+        echo [OK] Процесс остановлен. Запускаю сервер...
+        echo.
+    ) else (
+        echo.
+        echo Использую порт 8001...
+        set API_PORT=8001
+    )
+) else (
+    set API_PORT=8000
+)
+
+if "!API_PORT!"=="" set API_PORT=8000
+echo API будет доступен по адресу: http://localhost:!API_PORT!
+echo Документация: http://localhost:!API_PORT!/docs
+echo.
+echo Для остановки нажмите Ctrl+C
+echo.
+python app/main.py
+pause
+goto :end
+
+:option3
+echo.
+echo Запуск Streamlit UI...
+cd /d "%~dp0.."
+set PYTHONPATH=%CD%
+
+REM Автоматическое определение порта API
+set API_PORT=8000
+netstat -ano | findstr :8000 >nul 2>&1
+if errorlevel 1 (
+    netstat -ano | findstr :8001 >nul 2>&1
+    if not errorlevel 1 (
+        set API_PORT=8001
+        echo [OK] API найден на порту 8001
+    ) else (
+        echo [ВНИМАНИЕ] API не найден на портах 8000 и 8001
+        echo Убедитесь, что FastAPI сервер запущен!
+        echo.
+    )
+) else (
+    echo [OK] API найден на порту 8000
+)
+
+REM Устанавливаем API_BASE_URL для Streamlit
+set API_BASE_URL=http://localhost:%API_PORT%
+echo [OK] API_BASE_URL установлен: %API_BASE_URL%
+echo UI будет доступен по адресу: http://localhost:8501
+echo.
+echo Для остановки нажмите Ctrl+C
+echo.
+streamlit run app/ui/streamlit_app.py
+pause
+goto :end
+
+:option4
+echo.
+echo Запуск всех тестов...
+cd /d "%~dp0.."
+set PYTHONPATH=%CD%
+python scripts/run_tests.py all
+pause
+goto :end
+
+:option5
+echo Выход...
+goto :end
 
 :end
 endlocal

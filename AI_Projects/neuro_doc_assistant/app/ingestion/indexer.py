@@ -141,9 +141,16 @@ class QdrantIndexer:
         if "experiment_id" in chunk.metadata:
             payload["experiment_id"] = chunk.metadata["experiment_id"]
         
+        # Qdrant требует числовые ID или UUID
+        # Преобразуем строковый chunk_id в числовой ID используя hash
+        import hashlib
+        point_id = int(hashlib.md5(chunk.chunk_id.encode('utf-8')).hexdigest()[:15], 16)
+        # Ограничиваем до unsigned 64-bit integer (Qdrant поддерживает до 2^63-1)
+        point_id = point_id % (2**63 - 1)
+        
         # Создаём точку
         point = PointStruct(
-            id=chunk.chunk_id,
+            id=point_id,
             vector=embedding,
             payload=payload
         )

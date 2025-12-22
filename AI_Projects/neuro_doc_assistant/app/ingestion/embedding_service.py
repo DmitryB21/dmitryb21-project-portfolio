@@ -6,10 +6,17 @@
 """
 
 import os
+import uuid
 from typing import List
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+import urllib3
+
+from app.generation.gigachat_auth import GigaChatAuth
+
+# Отключаем предупреждения о небезопасных SSL запросах
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 class EmbeddingService:
@@ -28,7 +35,10 @@ class EmbeddingService:
         model_version: str = "GigaChat",
         embedding_dim: int = 1536,
         api_key: str = None,
-        batch_size: int = 10
+        batch_size: int = 10,
+        mock_mode: bool = False,
+        auth_key: str = None,
+        scope: str = None
     ):
         """
         Инициализация EmbeddingService.
@@ -36,13 +46,38 @@ class EmbeddingService:
         Args:
             model_version: Версия модели embeddings (фиксируется для воспроизводимости)
             embedding_dim: Размерность векторов (1536 или 1024)
-            api_key: API ключ для GigaChat (если None, берётся из переменных окружения)
+            api_key: Устаревший параметр (для обратной совместимости). Используйте auth_key.
             batch_size: Размер батча для обработки текстов
+            mock_mode: Если True, использует моковые embeddings вместо реального API
+            auth_key: Base64 encoded "Client ID:Client Secret" для OAuth 2.0 (если None, берётся из GIGACHAT_AUTH_KEY)
+            scope: Scope для OAuth (GIGACHAT_API_PERS, GIGACHAT_API_B2B, GIGACHAT_API_CORP)
         """
         self.model_version = model_version
         self.embedding_dim = embedding_dim
-        self.api_key = api_key or os.getenv("GIGACHAT_API_KEY")
         self.batch_size = batch_size
+        
+        # Определяем auth_key
+        self.auth_key = auth_key or os.getenv("GIGACHAT_AUTH_KEY")
+        self.scope = scope or os.getenv("GIGACHAT_SCOPE", "GIGACHAT_API_PERS")
+        
+        # Для обратной совместимости: если передан api_key (старый формат), используем его как auth_key
+        if api_key and not self.auth_key:
+            self.auth_key = api_key
+        
+        # Определяем mock mode
+        if mock_mode or os.getenv("GIGACHAT_MOCK_MODE", "false").lower() == "true":
+            self.mock_mode = True
+        elif not self.auth_key:
+            # Если auth_key не предоставлен, включаем mock mode
+            self.mock_mode = True
+        else:
+            self.mock_mode = False
+        
+        # Инициализация OAuth аутентификации
+        if not self.mock_mode:
+            self.auth = GigaChatAuth(auth_key=self.auth_key, scope=self.scope)
+        else:
+            self.auth = None
         
         # Настройка HTTP сессии с retry
         self.session = requests.Session()
@@ -55,8 +90,14 @@ class EmbeddingService:
         self.session.mount("http://", adapter)
         self.session.mount("https://", adapter)
         
-        # Базовый URL для GigaChat API (нужно уточнить актуальный endpoint)
-        self.api_url = os.getenv("GIGACHAT_EMBEDDINGS_URL", "https://api.gigachat.ai/v1/embeddings")
+        # Отключаем проверку SSL для GigaChat API (требуется из-за самоподписанного сертификата)
+        self.session.verify = False
+        
+        # Официальный endpoint для GigaChat Embeddings API
+        self.api_url = os.getenv(
+            "GIGACHAT_EMBEDDINGS_URL",
+            "https://gigachat.devices.sberbank.ru/api/v1/embeddings"
+        )
     
     def generate_embeddings(self, texts: List[str]) -> List[List[float]]:
         """
@@ -123,17 +164,28 @@ class EmbeddingService:
         Raises:
             Exception: При ошибках API
         """
-        # TODO: Реализовать реальный вызов GigaChat Embeddings API
-        # Пока возвращаем моковый вектор для тестов
-        
-        if not self.api_key:
-            # Для тестов без API ключа возвращаем моковый вектор
-            return [0.1] * self.embedding_dim
+        # Если включен mock mode, возвращаем моковый вектор
+        if self.mock_mode:
+            return self._generate_mock_embedding(text)
         
         try:
+            # Получаем access token через OAuth 2.0
+            if not self.auth:
+                # Если auth не инициализирован, используем mock mode
+                return self._generate_mock_embedding(text)
+            
+            access_token = self.auth.get_access_token()
+            if not access_token:
+                # Если не удалось получить токен, используем mock mode
+                return self._generate_mock_embedding(text)
+            
+            # Генерируем уникальный идентификатор запроса (UUID4)
+            request_id = str(uuid.uuid4())
+            
             headers = {
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json"
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json",
+                "X-Request-ID": request_id
             }
             
             payload = {
@@ -158,9 +210,41 @@ class EmbeddingService:
                     return embedding
             
             # Если формат ответа неожиданный, возвращаем моковый вектор
-            return [0.1] * self.embedding_dim
+            return self._generate_mock_embedding(text)
             
         except Exception as e:
             # В production здесь должно быть логирование и обработка ошибок
-            raise Exception(f"Error calling GigaChat Embeddings API: {e}")
+            # При ошибке подключения также используем mock mode
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Ошибка при вызове GigaChat Embeddings API: {e}. Используется mock mode.")
+            return self._generate_mock_embedding(text)
+    
+    def _generate_mock_embedding(self, text: str) -> List[float]:
+        """
+        Генерирует моковый embedding на основе текста.
+        Использует простой hash-based подход для детерминированности.
+        
+        Args:
+            text: Текст для генерации embedding
+            
+        Returns:
+            Моковый вектор заданной размерности
+        """
+        import hashlib
+        
+        # Используем hash текста для генерации детерминированного вектора
+        text_hash = hashlib.md5(text.encode('utf-8')).hexdigest()
+        
+        # Генерируем вектор на основе hash
+        embedding = []
+        for i in range(self.embedding_dim):
+            # Используем разные части hash для разных элементов вектора
+            hash_index = i % len(text_hash)
+            char_value = ord(text_hash[hash_index])
+            # Нормализуем значение в диапазон [-1, 1]
+            normalized_value = (char_value % 200 - 100) / 100.0
+            embedding.append(normalized_value)
+        
+        return embedding
 

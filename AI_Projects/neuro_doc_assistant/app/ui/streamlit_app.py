@@ -10,10 +10,37 @@ from datetime import datetime
 
 
 # Конфигурация API
-API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
+def detect_api_port() -> str:
+    """Автоматическое определение порта API (8000 или 8001)"""
+    # Сначала проверяем переменную окружения
+    env_url = os.getenv("API_BASE_URL")
+    if env_url:
+        return env_url
+    
+    # Проверяем порт 8000
+    try:
+        response = requests.get("http://localhost:8000/health", timeout=1)
+        if response.status_code == 200:
+            return "http://localhost:8000"
+    except Exception:
+        pass
+    
+    # Проверяем порт 8001
+    try:
+        response = requests.get("http://localhost:8001/health", timeout=1)
+        if response.status_code == 200:
+            return "http://localhost:8001"
+    except Exception:
+        pass
+    
+    # По умолчанию возвращаем 8000
+    return "http://localhost:8000"
+
+API_BASE_URL = detect_api_port()
 API_ASK_ENDPOINT = f"{API_BASE_URL}/ask"
 API_HEALTH_ENDPOINT = f"{API_BASE_URL}/health"
 API_METRICS_ENDPOINT = f"{API_BASE_URL}/admin/metrics"
+API_SERVICES_STATUS_ENDPOINT = f"{API_BASE_URL}/admin/services/status"
 
 
 def check_api_health() -> bool:
@@ -23,6 +50,17 @@ def check_api_health() -> bool:
         return response.status_code == 200
     except Exception:
         return False
+
+
+def get_services_status() -> Dict[str, Any]:
+    """Получение статуса внешних сервисов (Qdrant и GigaChat API)"""
+    try:
+        response = requests.get(API_SERVICES_STATUS_ENDPOINT, timeout=5)
+        if response.status_code == 200:
+            return response.json()
+    except Exception:
+        pass
+    return None
 
 
 def ask_agent(query: str, k: int = 3) -> Dict[str, Any]:
@@ -127,6 +165,86 @@ def main():
             st.error("❌ API недоступен")
             st.info(f"Проверьте, что API запущен на {API_BASE_URL}")
             st.stop()
+        
+        st.divider()
+        
+        # Статус внешних сервисов
+        st.subheader("🔌 Статус сервисов")
+        
+        services_status = get_services_status()
+        if services_status:
+            # Qdrant статус
+            qdrant_status = services_status.get("qdrant", {})
+            qdrant_available = qdrant_status.get("available", False)
+            qdrant_message = qdrant_status.get("message", "Статус неизвестен")
+            qdrant_details = qdrant_status.get("details", {})
+            
+            if qdrant_available:
+                st.success(f"**Qdrant:** {qdrant_message}")
+                if qdrant_details:
+                    with st.expander("📊 Детали Qdrant"):
+                        if "points_count" in qdrant_details:
+                            st.metric("Точек в коллекции", qdrant_details["points_count"])
+                        if "vector_size" in qdrant_details:
+                            st.write(f"**Размерность векторов:** {qdrant_details['vector_size']}")
+                        if "distance" in qdrant_details:
+                            st.write(f"**Метрика расстояния:** {qdrant_details['distance']}")
+                        if "collection_name" in qdrant_details:
+                            st.write(f"**Коллекция:** {qdrant_details['collection_name']}")
+            else:
+                st.error(f"**Qdrant:** {qdrant_message}")
+                if qdrant_details:
+                    with st.expander("⚠️ Детали ошибки"):
+                        st.json(qdrant_details)
+            
+            st.divider()
+            
+            # GigaChat API статус
+            gigachat_status = services_status.get("gigachat_api", {})
+            gigachat_available = gigachat_status.get("available", False)
+            gigachat_message = gigachat_status.get("message", "Статус неизвестен")
+            gigachat_details = gigachat_status.get("details", {})
+            
+            if gigachat_available:
+                st.success(f"**GigaChat API:** {gigachat_message}")
+            else:
+                # Для mock mode показываем предупреждение, а не ошибку
+                if gigachat_details.get("mock_mode", False):
+                    st.warning(f"**GigaChat API:** {gigachat_message}")
+                else:
+                    st.error(f"**GigaChat API:** {gigachat_message}")
+            
+            if gigachat_details:
+                with st.expander("📊 Детали GigaChat API"):
+                    # Показываем auth_key или api_key (для обратной совместимости)
+                    if "auth_key_set" in gigachat_details:
+                        st.write(f"**OAuth ключ:** {'✅ установлен' if gigachat_details['auth_key_set'] else '❌ не установлен'}")
+                    elif "api_key_set" in gigachat_details:
+                        st.write(f"**API ключ:** {'✅ установлен' if gigachat_details['api_key_set'] else '❌ не установлен'}")
+                    
+                    if "scope" in gigachat_details:
+                        st.write(f"**Scope:** {gigachat_details['scope']}")
+                    
+                    if "mock_mode" in gigachat_details:
+                        st.write(f"**Mock mode:** {'✅ включен' if gigachat_details['mock_mode'] else '❌ выключен'}")
+                    
+                    if "api_url" in gigachat_details:
+                        st.write(f"**API URL:** {gigachat_details['api_url']}")
+                    if "embeddings_url" in gigachat_details:
+                        st.write(f"**Embeddings URL:** {gigachat_details['embeddings_url']}")
+                    
+                    # Показываем рекомендацию, если есть
+                    if "recommendation" in gigachat_details:
+                        st.warning(f"💡 **Рекомендация:** {gigachat_details['recommendation']}")
+                    
+                    # Показываем тип ошибки, если есть
+                    if "error_type" in gigachat_details:
+                        st.write(f"**Тип ошибки:** {gigachat_details['error_type']}")
+                    
+                    if "note" in gigachat_details:
+                        st.info(gigachat_details["note"])
+        else:
+            st.warning("⚠️ Не удалось получить статус сервисов")
         
         st.divider()
         
