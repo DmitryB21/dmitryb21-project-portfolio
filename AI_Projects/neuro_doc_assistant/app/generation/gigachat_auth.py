@@ -12,6 +12,10 @@ import requests
 from typing import Optional
 from urllib3.util.retry import Retry
 from requests.adapters import HTTPAdapter
+from dotenv import load_dotenv
+
+# Загружаем переменные окружения из .env файла
+load_dotenv()
 
 
 class GigaChatAuth:
@@ -52,9 +56,10 @@ class GigaChatAuth:
         # (требуется из-за самоподписанного сертификата)
         self.session = requests.Session()
         retry_strategy = Retry(
-            total=3,
-            backoff_factor=1,
-            status_forcelist=[429, 500, 502, 503, 504]
+            total=5,  # Увеличиваем количество попыток для rate limiting
+            backoff_factor=2,  # Увеличиваем задержку между попытками (exponential backoff)
+            status_forcelist=[429, 500, 502, 503, 504],
+            respect_retry_after_header=True  # Учитываем заголовок Retry-After от сервера
         )
         adapter = HTTPAdapter(max_retries=retry_strategy)
         self.session.mount("http://", adapter)
@@ -130,6 +135,26 @@ class GigaChatAuth:
                         self._token_expires_at = expires_at_ms
                     
                     return access_token
+            elif response.status_code == 400:
+                # Ошибка 400 обычно означает неправильный формат auth_key
+                import logging
+                logger = logging.getLogger(__name__)
+                error_text = response.text[:500]
+                logger.error(
+                    f"Ошибка получения токена GigaChat API (статус 400): {error_text}\n"
+                    f"Проверьте формат GIGACHAT_AUTH_KEY. Он должен быть Base64 encoded 'ClientID:ClientSecret'"
+                )
+                return None
+            elif response.status_code == 429:
+                # Rate limiting - ждём перед повтором
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(
+                    f"Rate limiting (429) при получении токена. Ожидание 5 секунд..."
+                )
+                time.sleep(5)  # Ждём 5 секунд перед повтором
+                # Не возвращаем None сразу, чтобы retry strategy могла повторить
+                return None
             else:
                 # Логируем ошибку, но не прерываем работу
                 import logging

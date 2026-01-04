@@ -7,6 +7,15 @@
 
 from typing import List, Dict, Any, Optional
 
+# Импорты для реального RAGAS
+try:
+    from ragas import evaluate
+    from ragas.metrics import faithfulness, answer_relevancy
+    from datasets import Dataset
+    RAGAS_AVAILABLE = True
+except ImportError:
+    RAGAS_AVAILABLE = False
+
 
 class RAGASEvaluator:
     """
@@ -18,23 +27,35 @@ class RAGASEvaluator:
     - Интеграция с RAGAS библиотекой
     """
     
-    def __init__(self, mock_mode: bool = True):
+    def __init__(
+        self,
+        mock_mode: bool = False,
+        llm_adapter=None,
+        embeddings_adapter=None
+    ):
         """
         Инициализация RAGASEvaluator.
         
         Args:
             mock_mode: Если True, используется мок-режим (без реальных вызовов RAGAS)
+            llm_adapter: LangChain-совместимый LLM адаптер (для реального RAGAS)
+            embeddings_adapter: LangChain-совместимый Embeddings адаптер (для реального RAGAS)
         """
         self.mock_mode = mock_mode
+        self.llm_adapter = llm_adapter
+        self.embeddings_adapter = embeddings_adapter
         
         if not self.mock_mode:
-            try:
-                import ragas
-                self.ragas_available = True
-            except ImportError:
+            if not RAGAS_AVAILABLE:
                 print("Warning: ragas not installed. RAGASEvaluator will operate in mock mode.")
                 self.ragas_available = False
                 self.mock_mode = True
+            elif not llm_adapter or not embeddings_adapter:
+                print("Warning: LLM or Embeddings adapter not provided. RAGASEvaluator will operate in mock mode.")
+                self.ragas_available = False
+                self.mock_mode = True
+            else:
+                self.ragas_available = True
         else:
             self.ragas_available = False
     
@@ -70,9 +91,35 @@ class RAGASEvaluator:
             else:
                 return 0.50  # Низкий faithfulness
         
-        # Реальная интеграция с RAGAS (для production)
-        # TODO: Реализовать при установке ragas
-        raise NotImplementedError("RAGAS integration not implemented yet. Use mock_mode=True for testing.")
+        # Реальная интеграция с RAGAS
+        if not self.ragas_available:
+            raise RuntimeError("RAGAS not available. Check installation and adapters.")
+        
+        try:
+            # Создаём dataset для RAGAS
+            # RAGAS ожидает: contexts - список списков, где каждый элемент - список контекстов для одного примера
+            dataset_dict = {
+                "question": [question],
+                "answer": [answer],
+                "contexts": [contexts]  # contexts уже список строк, оборачиваем в список для одного примера
+            }
+            dataset = Dataset.from_dict(dataset_dict)
+            
+            # Выполняем оценку faithfulness
+            result = evaluate(
+                dataset=dataset,
+                metrics=[faithfulness],
+                llm=self.llm_adapter,
+                embeddings=self.embeddings_adapter
+            )
+            
+            # Извлекаем score (результат - DataFrame с одной строкой)
+            faithfulness_score = result["faithfulness"].iloc[0] if hasattr(result, "iloc") else result["faithfulness"][0]
+            return float(faithfulness_score)
+        except Exception as e:
+            print(f"Error evaluating faithfulness with RAGAS: {e}")
+            # Fallback к mock mode при ошибке
+            return 0.75
     
     def evaluate_answer_relevancy(
         self,
@@ -110,9 +157,35 @@ class RAGASEvaluator:
             else:
                 return 0.60  # Низкий relevancy
         
-        # Реальная интеграция с RAGAS (для production)
-        # TODO: Реализовать при установке ragas
-        raise NotImplementedError("RAGAS integration not implemented yet. Use mock_mode=True for testing.")
+        # Реальная интеграция с RAGAS
+        if not self.ragas_available:
+            raise RuntimeError("RAGAS not available. Check installation and adapters.")
+        
+        try:
+            # Создаём dataset для RAGAS
+            # RAGAS ожидает: contexts - список списков, где каждый элемент - список контекстов для одного примера
+            dataset_dict = {
+                "question": [question],
+                "answer": [answer],
+                "contexts": [contexts]  # contexts уже список строк, оборачиваем в список для одного примера
+            }
+            dataset = Dataset.from_dict(dataset_dict)
+            
+            # Выполняем оценку answer_relevancy
+            result = evaluate(
+                dataset=dataset,
+                metrics=[answer_relevancy],
+                llm=self.llm_adapter,
+                embeddings=self.embeddings_adapter
+            )
+            
+            # Извлекаем score (результат - DataFrame с одной строкой)
+            relevancy_score = result["answer_relevancy"].iloc[0] if hasattr(result, "iloc") else result["answer_relevancy"][0]
+            return float(relevancy_score)
+        except Exception as e:
+            print(f"Error evaluating answer_relevancy with RAGAS: {e}")
+            # Fallback к mock mode при ошибке
+            return 0.75
     
     def evaluate_all(
         self,

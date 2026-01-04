@@ -80,9 +80,10 @@ echo 1. Запустить тесты
 echo 2. Запустить FastAPI сервер
 echo 3. Запустить Streamlit UI
 echo 4. Запустить все тесты и показать статистику
-echo 5. Выход
+echo 5. Запустить Full Stack (FastAPI + Streamlit)
+echo 6. Выход
 echo.
-set /p choice="Выберите действие (1-5): "
+set /p choice="Выберите действие (1-6): "
 
 REM Удаляем пробелы и другие невидимые символы из переменной choice
 for /f "delims=" %%i in ("!choice!") do set choice=%%i
@@ -95,6 +96,7 @@ if /i "!choice!"=="2" goto :option2
 if /i "!choice!"=="3" goto :option3
 if /i "!choice!"=="4" goto :option4
 if /i "!choice!"=="5" goto :option5
+if /i "!choice!"=="6" goto :option6
 
 echo [ОШИБКА] Неверный выбор: [!choice!]
 pause
@@ -144,12 +146,17 @@ if not errorlevel 1 (
 )
 
 if "!API_PORT!"=="" set API_PORT=8000
+echo.
 echo API будет доступен по адресу: http://localhost:!API_PORT!
 echo Документация: http://localhost:!API_PORT!/docs
 echo.
 echo Для остановки нажмите Ctrl+C
 echo.
-python app/main.py
+REM Устанавливаем переменную окружения для Python (важно: без пробелов вокруг =)
+REM Передаем переменную напрямую в команду Python, чтобы она имела приоритет над .env
+echo [DEBUG] API_PORT установлен: !API_PORT!
+REM Запускаем Python с передачей порта через переменную окружения
+set API_PORT=!API_PORT! && python app/main.py
 pause
 goto :end
 
@@ -197,6 +204,15 @@ pause
 goto :end
 
 :option5
+echo.
+echo Запуск Full Stack (FastAPI + Streamlit)...
+cd /d "%~dp0.."
+set PYTHONPATH=%CD%
+python scripts/start_full_stack.py
+pause
+goto :end
+
+:option6
 echo Выход...
 goto :end
 

@@ -1,0 +1,28 @@
+global:
+  scrape_interval: 15s  # Интервал сбора метрик
+  evaluation_interval: 15s  # Интервал оценки правил
+
+scrape_configs:
+  - job_name: 'neuro-doc-assistant'
+    static_configs:
+      # ВАЖНО: Выберите правильный адрес в зависимости от вашей конфигурации:
+      # 
+      # Если Prometheus в Docker, а FastAPI локально на Windows:
+      # - Используйте IP адрес вашего хоста (см. инструкцию ниже)
+      # - Или используйте host.docker.internal (если поддерживается)
+      #
+      # Если оба запущены локально (не в Docker):
+      # - Используйте localhost:8000 или 127.0.0.1:8000
+      #
+      # Если оба в Docker (через docker-compose):
+      # - Используйте имя сервиса, например: fastapi:8000
+      #
+      # Попробуйте сначала host.docker.internal (должен работать после добавления extra_hosts)
+      - targets: ['host.docker.internal:8000']  # Для Docker на Windows/Mac
+      # Если host.docker.internal не работает, раскомментируйте одну из альтернатив:
+      # - targets: ['192.168.1.152:8000']    # IP адрес вашего хоста (Windows)
+      # - targets: ['172.17.0.1:8000']       # Docker bridge IP (Linux)
+      # - targets: ['localhost:8000']        # Если оба локально
+    metrics_path: '/admin/metrics/prometheus'
+    scrape_interval: 5s  # Собираем метрики каждые 5 секунд
+

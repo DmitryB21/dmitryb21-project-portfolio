@@ -84,7 +84,26 @@ class PrometheusMetrics:
         self.generation_latency = self.Histogram(
             'neuro_doc_assistant_generation_latency_seconds',
             'Generation latency in seconds',
-            buckets=[0.1, 0.2, 0.3, 0.5, 0.7, 1.0, 1.5, 2.0],
+            buckets = [0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 2.0, 2.5, 3.0],
+            registry=self.registry
+        )
+        
+        # Gauge для последних значений latency (для мониторинга текущего состояния)
+        self.last_request_latency = self.Gauge(
+            'neuro_doc_assistant_request_latency_last_seconds',
+            'Last request latency in seconds',
+            registry=self.registry
+        )
+        
+        self.last_retrieval_latency = self.Gauge(
+            'neuro_doc_assistant_retrieval_latency_last_seconds',
+            'Last retrieval latency in seconds',
+            registry=self.registry
+        )
+        
+        self.last_generation_latency = self.Gauge(
+            'neuro_doc_assistant_generation_latency_last_seconds',
+            'Last generation latency in seconds',
             registry=self.registry
         )
         
@@ -115,6 +134,7 @@ class PrometheusMetrics:
             latency_seconds: Latency в секундах
         """
         self.request_latency.observe(latency_seconds)
+        self.last_request_latency.set(latency_seconds)
     
     def record_retrieval_latency(self, latency_seconds: float) -> None:
         """
@@ -124,6 +144,7 @@ class PrometheusMetrics:
             latency_seconds: Latency в секундах
         """
         self.retrieval_latency.observe(latency_seconds)
+        self.last_retrieval_latency.set(latency_seconds)
     
     def record_generation_latency(self, latency_seconds: float) -> None:
         """
@@ -133,6 +154,7 @@ class PrometheusMetrics:
             latency_seconds: Latency в секундах
         """
         self.generation_latency.observe(latency_seconds)
+        self.last_generation_latency.set(latency_seconds)
     
     def record_error(self, error_type: str) -> None:
         """

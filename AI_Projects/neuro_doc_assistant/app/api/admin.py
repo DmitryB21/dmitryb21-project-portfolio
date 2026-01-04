@@ -4,14 +4,17 @@ AdminAPI - REST API для мониторинга и управления
 
 import os
 import requests
-from typing import Optional
-from datetime import datetime
+from typing import Optional, Dict, Any
+from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException, status, Query, Response
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
 from app.agent.agent import AgentController
 from app.monitoring.prometheus_metrics import PrometheusMetrics
+from app.api.indexing_status import get_tracker, IndexingStatus
+import subprocess
+import threading
 
 load_dotenv()
 
@@ -52,6 +55,32 @@ class ServicesStatusResponse(BaseModel):
     """Ответ со статусом сервисов"""
     qdrant: ServiceStatus
     gigachat_api: ServiceStatus
+
+
+class DeleteCollectionResponse(BaseModel):
+    """Ответ на удаление коллекции"""
+    success: bool
+    message: str
+    collection_name: str
+
+
+class IndexingResponse(BaseModel):
+    """Ответ на запуск индексации"""
+    success: bool
+    message: str
+    task_id: Optional[str] = None
+
+
+class IndexingStatusResponse(BaseModel):
+    """Ответ со статусом индексации"""
+    status: str
+    progress: float
+    current_step: str
+    message: str
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    error: Optional[str] = None
+    stats: Dict[str, Any]  # Может содержать как числа, так и строки (например, embedding_mode)
 
 
 def create_admin_router(
@@ -184,6 +213,243 @@ def create_admin_router(
             qdrant=qdrant_status,
             gigachat_api=gigachat_status
         )
+    
+    @router.delete("/qdrant/collection", response_model=DeleteCollectionResponse, status_code=status.HTTP_200_OK)
+    async def delete_collection(collection_name: str = Query(default="neuro_docs")) -> DeleteCollectionResponse:
+        """
+        Удаление коллекции из Qdrant (очистка всех векторов)
+        
+        Args:
+            collection_name: Имя коллекции для удаления
+        
+        Returns:
+            Результат удаления коллекции
+        """
+        try:
+            qdrant_client = controller.retriever.qdrant_client
+            
+            # Проверяем существование коллекции
+            collections = qdrant_client.get_collections()
+            collection_names = [col.name for col in collections.collections]
+            
+            if collection_name not in collection_names:
+                return DeleteCollectionResponse(
+                    success=False,
+                    message=f"Коллекция '{collection_name}' не найдена",
+                    collection_name=collection_name
+                )
+            
+            # Удаляем коллекцию
+            qdrant_client.delete_collection(collection_name)
+            
+            # Сбрасываем статус индексации, так как коллекция удалена
+            try:
+                tracker = get_tracker()
+                tracker.reset()
+            except Exception:
+                pass  # Игнорируем ошибки при сбросе статуса
+            
+            return DeleteCollectionResponse(
+                success=True,
+                message=f"Коллекция '{collection_name}' успешно удалена",
+                collection_name=collection_name
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Ошибка при удалении коллекции: {str(e)}"
+            )
+    
+    @router.post("/indexing/start", response_model=IndexingResponse, status_code=status.HTTP_202_ACCEPTED)
+    async def start_indexing() -> IndexingResponse:
+        """
+        Запуск индексации документов в Qdrant
+        
+        Returns:
+            Результат запуска индексации
+        """
+        try:
+            tracker = get_tracker()
+            current_status = tracker.get_status()
+            
+            # Проверяем, не запущена ли уже индексация
+            if current_status["status"] == IndexingStatus.RUNNING.value:
+                # Проверяем, не зависла ли индексация
+                started_at = current_status.get("started_at")
+                if started_at:
+                    try:
+                        start_time = datetime.fromisoformat(started_at)
+                        # Если индексация идёт больше 15 минут, считаем её зависшей и разрешаем перезапуск
+                        time_since_start = datetime.now() - start_time
+                        if time_since_start > timedelta(minutes=15):
+                            # Сбрасываем зависший процесс
+                            tracker.reset()
+                            # Продолжаем запуск новой индексации
+                        else:
+                            return IndexingResponse(
+                                success=False,
+                                message=f"Индексация уже выполняется (запущена {int(time_since_start.total_seconds() / 60)} минут назад). Дождитесь завершения или сбросьте статус.",
+                                task_id=None
+                            )
+                    except Exception:
+                        # Если не удалось распарсить время, разрешаем перезапуск
+                        tracker.reset()
+                else:
+                    # Если нет времени начала, но статус RUNNING - возможно, это зависший процесс
+                    # Разрешаем перезапуск
+                    tracker.reset()
+            
+            # Запускаем индексацию в отдельном потоке
+            def run_indexing():
+                import sys
+                from pathlib import Path
+                project_root = Path(__file__).parent.parent.parent
+                script_path = project_root / "scripts" / "run_ingestion.py"
+                
+                # Создаем копию окружения с загруженными переменными из .env
+                env = os.environ.copy()
+                # Убеждаемся, что переменные из .env переданы
+                from dotenv import dotenv_values
+                env_file = project_root / ".env"
+                if env_file.exists():
+                    env_vars = dotenv_values(env_file)
+                    # Обновляем только те переменные, которых нет в текущем окружении
+                    # или которые явно заданы в .env
+                    for key, value in env_vars.items():
+                        if value is not None:  # dotenv_values может вернуть None для пустых значений
+                            env[key] = value
+                    # Логируем для отладки (можно убрать в production)
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.debug(f"Передано переменных окружения в subprocess: {len(env_vars)}")
+                
+                # Используем тот же Python интерпретатор, что и текущий процесс
+                # Это гарантирует, что все установленные пакеты будут доступны
+                python_executable = sys.executable
+                
+                subprocess.run(
+                    [python_executable, str(script_path)],
+                    cwd=project_root,
+                    env=env
+                )
+            
+            thread = threading.Thread(target=run_indexing, daemon=True)
+            thread.start()
+            
+            return IndexingResponse(
+                success=True,
+                message="Индексация запущена в фоновом режиме.",
+                task_id=None
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Ошибка при запуске индексации: {str(e)}"
+            )
+    
+    @router.get("/indexing/status", response_model=IndexingStatusResponse, status_code=status.HTTP_200_OK)
+    async def get_indexing_status() -> IndexingStatusResponse:
+        """
+        Получение статуса индексации
+        
+        Returns:
+            Текущий статус индексации
+        """
+        try:
+            tracker = get_tracker()
+            status_data = tracker.get_status()
+            
+            # Проверяем, не зависла ли индексация (если статус "running" слишком долго)
+            if status_data["status"] == IndexingStatus.RUNNING.value:
+                started_at = status_data.get("started_at")
+                if started_at:
+                    try:
+                        start_time = datetime.fromisoformat(started_at)
+                        time_since_start = datetime.now() - start_time
+                        
+                        # Если индексация идёт больше 30 минут, считаем её зависшей и автоматически сбрасываем
+                        if time_since_start > timedelta(minutes=30):
+                            tracker.reset()
+                            status_data = tracker.get_status()
+                            return IndexingStatusResponse(
+                                status=status_data["status"],
+                                progress=status_data["progress"],
+                                current_step=status_data["current_step"],
+                                message="Индексация зависла и была автоматически сброшена",
+                                started_at=status_data.get("started_at"),
+                                completed_at=status_data.get("completed_at"),
+                                error="Индексация зависла (превышено время ожидания 30 минут)",
+                                stats=status_data.get("stats", {})
+                            )
+                        # Если индексация идёт больше 15 минут, предупреждаем
+                        elif time_since_start > timedelta(minutes=15):
+                            # Не сбрасываем, но отмечаем как потенциально зависшую
+                            pass
+                    except Exception:
+                        # Если не удалось распарсить время, но статус RUNNING - возможно зависший процесс
+                        # Сбрасываем через 5 минут после последнего обновления (если есть)
+                        tracker.reset()
+                        status_data = tracker.get_status()
+            
+            return IndexingStatusResponse(
+                status=status_data["status"],
+                progress=status_data["progress"],
+                current_step=status_data["current_step"],
+                message=status_data["message"],
+                started_at=status_data.get("started_at"),
+                completed_at=status_data.get("completed_at"),
+                error=status_data.get("error"),
+                stats=status_data.get("stats", {})
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Ошибка при получении статуса индексации: {str(e)}"
+            )
+    
+    @router.post("/indexing/reset", response_model=Dict[str, Any], status_code=status.HTTP_200_OK)
+    async def reset_indexing_status(force: bool = Query(default=False, description="Принудительный сброс даже если процесс запущен")) -> Dict[str, Any]:
+        """
+        Сброс статуса индексации
+        
+        Args:
+            force: Принудительный сброс даже если статус "running"
+        
+        Returns:
+            Результат сброса статуса
+        """
+        try:
+            tracker = get_tracker()
+            current_status = tracker.get_status()
+            
+            # Если статус "running" и не принудительный сброс, проверяем время
+            if current_status["status"] == IndexingStatus.RUNNING.value and not force:
+                started_at = current_status.get("started_at")
+                if started_at:
+                    try:
+                        start_time = datetime.fromisoformat(started_at)
+                        time_since_start = datetime.now() - start_time
+                        # Если процесс запущен менее 5 минут, предупреждаем
+                        if time_since_start < timedelta(minutes=5):
+                            return {
+                                "success": False,
+                                "message": f"Индексация запущена недавно ({int(time_since_start.total_seconds() / 60)} минут назад). Используйте force=true для принудительного сброса."
+                            }
+                    except Exception:
+                        pass  # Игнорируем ошибки парсинга
+            
+            # Выполняем сброс
+            tracker.reset()
+            
+            return {
+                "success": True,
+                "message": "Статус индексации сброшен"
+            }
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Ошибка при сбросе статуса индексации: {str(e)}"
+            )
     
     return router
 

@@ -3,8 +3,12 @@ FastAPI entrypoint для Neuro_Doc_Assistant
 """
 
 import os
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+# Загружаем переменные окружения из .env файла
+load_dotenv()
 
 from app.api.chat import create_app as create_chat_app
 from app.api.admin import create_admin_router
@@ -17,6 +21,15 @@ from app.generation.gigachat_client import LLMClient
 from app.evaluation.metrics import MetricsCollector
 from app.evaluation.ragas_evaluator import RAGASEvaluator
 from app.ingestion.embedding_service import EmbeddingService
+
+# Опциональный импорт адаптеров для RAGAS
+try:
+    from app.evaluation.ragas_adapters import GigaChatLLMAdapter, GigaChatEmbeddingsAdapter
+    RAGAS_ADAPTERS_AVAILABLE = True
+except ImportError:
+    RAGAS_ADAPTERS_AVAILABLE = False
+    GigaChatLLMAdapter = None
+    GigaChatEmbeddingsAdapter = None
 from qdrant_client import QdrantClient
 
 
@@ -78,7 +91,33 @@ def create_agent_controller() -> AgentController:
     )
     
     metrics_collector = MetricsCollector()
-    ragas_evaluator = RAGASEvaluator(mock_mode=True)  # В production можно переключить на реальный RAGAS
+    
+    # Инициализация RAGAS evaluator с реальным RAGAS
+    # Определяем, использовать ли реальный RAGAS или mock mode
+    use_ragas_mock = os.getenv("RAGAS_MOCK_MODE", "false").lower() == "true"
+    
+    # Проверяем доступность адаптеров (требуют langchain-core)
+    if use_ragas_mock or not RAGAS_ADAPTERS_AVAILABLE:
+        if not RAGAS_ADAPTERS_AVAILABLE:
+            print("⚠️  LangChain не установлен. RAGAS будет работать в mock mode.")
+            print("   Для использования реального RAGAS установите: pip install langchain-core langchain-community")
+        ragas_evaluator = RAGASEvaluator(mock_mode=True)
+    else:
+        try:
+            # Создаём адаптеры для RAGAS
+            llm_adapter = GigaChatLLMAdapter(llm_client=llm_client)
+            embeddings_adapter = GigaChatEmbeddingsAdapter(embedding_service=embedding_service)
+            
+            # Инициализируем RAGAS evaluator с реальными адаптерами
+            ragas_evaluator = RAGASEvaluator(
+                mock_mode=False,
+                llm_adapter=llm_adapter,
+                embeddings_adapter=embeddings_adapter
+            )
+        except Exception as e:
+            print(f"⚠️  Ошибка при инициализации RAGAS адаптеров: {e}")
+            print("   RAGAS будет работать в mock mode.")
+            ragas_evaluator = RAGASEvaluator(mock_mode=True)
     
     # Инициализация Prometheus метрик (опционально, если prometheus-client установлен)
     try:
@@ -147,7 +186,25 @@ if __name__ == "__main__":
         sys.path.insert(0, project_root)
     
     host = os.getenv("API_HOST", "0.0.0.0")
-    port = int(os.getenv("API_PORT", "8000"))
+    # Получаем порт из переменной окружения
+    # Приоритет: системная переменная окружения > .env файл > значение по умолчанию
+    # Сначала проверяем системную переменную (установленную в batch файле)
+    port_str = os.environ.get("API_PORT")  # os.environ.get() проверяет только системные переменные
+    if not port_str:
+        # Если системной переменной нет, проверяем .env (уже загружен через load_dotenv())
+        port_str = os.getenv("API_PORT")
+    
+    if port_str:
+        try:
+            port = int(port_str)
+            source = "системной переменной окружения" if "API_PORT" in os.environ else ".env файла"
+            print(f"ℹ️  Используется порт {port} из {source} (API_PORT={port_str})")
+        except ValueError:
+            print(f"⚠️  Неверное значение API_PORT: {port_str}. Используется порт 8000 по умолчанию.")
+            port = 8000
+    else:
+        port = 8000
+        print(f"ℹ️  Используется порт по умолчанию: {port} (API_PORT не установлен)")
     
     # Создаём приложение для запуска
     app = create_app()

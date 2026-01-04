@@ -1,0 +1,118 @@
+{
+    "annotations": { "list": [ { "builtIn": 1, "datasource": { "type": "grafana", "uid": "-- Grafana --" }, "enable": true, "hide": true, "name": "Annotations & Alerts", "type": "dashboard" } ] },
+    "editable": true,
+    "fiscalYearStartMonth": 0,
+    "graphTooltip": 1,
+    "links": [],
+    "liveNow": false,
+    "panels": [
+      {
+        "title": "Last E2E Latency",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 8, "x": 0, "y": 0 },
+        "datasource": { "type": "prometheus" },
+        "targets": [ { "expr": "neuro_doc_assistant_request_latency_last_seconds" } ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "decimals": 3,
+            "color": { "mode": "thresholds", "thresholds": { "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 2 }, { "color": "red", "value": 5 } ] } }
+          }
+        },
+        "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "center" }
+      },
+      {
+        "title": "Last Retrieval Latency",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 8, "x": 8, "y": 0 },
+        "datasource": { "type": "prometheus" },
+        "targets": [ { "expr": "neuro_doc_assistant_retrieval_latency_last_seconds" } ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "decimals": 3,
+            "color": { "mode": "thresholds", "thresholds": { "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 0.5 }, { "color": "red", "value": 1 } ] } }
+          }
+        },
+        "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "center" }
+      },
+      {
+        "title": "Last Generation Latency",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 8, "x": 16, "y": 0 },
+        "datasource": { "type": "prometheus" },
+        "targets": [ { "expr": "neuro_doc_assistant_generation_latency_last_seconds" } ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "decimals": 3,
+            "color": { "mode": "thresholds", "thresholds": { "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 1.5 }, { "color": "red", "value": 3 } ] } }
+          }
+        },
+        "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "center" }
+      },
+      {
+        "title": "Queries Per Second (QPS)",
+        "type": "timeseries",
+        "gridPos": { "h": 7, "w": 12, "x": 0, "y": 4 },
+        "datasource": { "type": "prometheus" },
+        "targets": [ { "expr": "rate(neuro_doc_assistant_requests_total[5m])", "legendFormat": "Requests/sec" } ],
+        "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "fillOpacity": 10 } } }
+      },
+      {
+        "title": "Overall Latency (Percentiles)",
+        "type": "timeseries",
+        "gridPos": { "h": 7, "w": 12, "x": 12, "y": 4 },
+        "datasource": { "type": "prometheus" },
+        "targets": [
+          { "expr": "histogram_quantile(0.95, sum by (le) (rate(neuro_doc_assistant_request_latency_seconds_bucket[10m])))", "legendFormat": "p95" },
+          { "expr": "histogram_quantile(0.50, sum by (le) (rate(neuro_doc_assistant_request_latency_seconds_bucket[10m])))", "legendFormat": "p50" }
+        ],
+        "fieldConfig": { "defaults": { "unit": "s", "custom": { "lineInterpolation": "smooth" } } }
+      },
+      {
+        "title": "Retrieval Latency (p95)",
+        "type": "timeseries",
+        "gridPos": { "h": 7, "w": 12, "x": 0, "y": 11 },
+        "datasource": { "type": "prometheus" },
+        "targets": [ { "expr": "histogram_quantile(0.95, sum by (le) (rate(neuro_doc_assistant_retrieval_latency_seconds_bucket[10m])))", "legendFormat": "Retrieval p95" } ],
+        "fieldConfig": { "defaults": { "unit": "s" } }
+      },
+      {
+        "title": "Generation Latency (p95)",
+        "type": "timeseries",
+        "gridPos": { "h": 7, "w": 12, "x": 12, "y": 11 },
+        "datasource": { "type": "prometheus" },
+        "targets": [ { "expr": "histogram_quantile(0.95, sum by (le) (rate(neuro_doc_assistant_generation_latency_seconds_bucket[10m])))", "legendFormat": "Generation p95" } ],
+        "fieldConfig": { "defaults": { "unit": "s" } }
+      },
+      {
+        "title": "Errors by Type",
+        "type": "timeseries",
+        "gridPos": { "h": 7, "w": 12, "x": 0, "y": 18 },
+        "datasource": { "type": "prometheus" },
+        "targets": [ { "expr": "sum by (error_type) (rate(neuro_doc_assistant_errors_total[5m]))", "legendFormat": "{{error_type}}" } ],
+        "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "bars" } } }
+      },
+      {
+        "title": "Active Requests",
+        "type": "stat",
+        "gridPos": { "h": 7, "w": 12, "x": 12, "y": 18 },
+        "datasource": { "type": "prometheus" },
+        "targets": [ { "expr": "neuro_doc_assistant_active_requests" } ],
+        "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "center" },
+        "fieldConfig": {
+          "defaults": {
+            "color": { "mode": "thresholds", "thresholds": { "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 3 } ] } }
+          }
+        }
+      }
+    ],
+    "schemaVersion": 38,
+    "style": "dark",
+    "tags": ["AI", "RAG", "NeuroDoc"],
+    "time": { "from": "now-3h", "to": "now" },
+    "title": "Neuro Doc Assistant Full Monitor",
+    "uid": "neuro_doc_full_v1",
+    "version": 1
+  }
